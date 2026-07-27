@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+dist/
+build/
+install/
+log/
+.fraeno/
+fraeno-report.json

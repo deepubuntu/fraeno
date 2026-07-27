@@ -1,0 +1,28 @@
+version: 1
+
+project:
+  name: fraeno-proof-robot
+
+validation:
+  steps:
+    - name: verify fixture source
+      command: ["python3", "-m", "compileall", "-q", "src"]
+      timeout_seconds: 60
+  observe:
+    command: ["fraeno-fixture-observe"]
+    timeout_seconds: 30
+  contract:
+    required_nodes:
+      - /sensor_driver
+      - /controller
+    required_topics:
+      - /sensor/reading
+      - /robot/command
+    required_services:
+      - /robot/health
+    required_actions:
+      - /robot/move
+    minimum_topic_rates_hz:
+      /sensor/reading: 15
+      /robot/command: 7
+    maximum_topic_rate_regression_percent: 30
