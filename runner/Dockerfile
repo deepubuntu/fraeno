@@ -33,4 +33,4 @@ COPY --from=builder /runtime /opt/fraeno/runtime
 RUN test "$(python3 -m fraeno.cli --version)" = "${FRAENO_VERSION}"
 
 WORKDIR /work
-ENTRYPOINT ["python3", "-m", "fraeno.cli"]
+ENTRYPOINT ["/ros_entrypoint.sh", "python3", "-m", "fraeno.cli"]

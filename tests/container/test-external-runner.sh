@@ -7,6 +7,16 @@ if [[ "$#" -ne 1 ]]; then
 fi
 
 image_id="$(docker image inspect --format '{{.Id}}' "$1")"
+entrypoint="$(
+  docker image inspect --format '{{join .Config.Entrypoint " "}}' "$image_id"
+)"
+if [[ "$entrypoint" != "/ros_entrypoint.sh python3 -m fraeno.cli" ]]; then
+  echo "runner entrypoint does not initialize ROS" >&2
+  exit 1
+fi
+docker run --rm --entrypoint /ros_entrypoint.sh "$image_id" \
+  python3 -c 'import rclpy'
+
 repository_fixture="$PWD/tests/fixtures/external_ros2_repository"
 hostile_fixture="$PWD/tests/fixtures/hostile_candidate"
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/fraeno-external-test.XXXXXX")"
