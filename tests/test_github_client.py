@@ -1,12 +1,13 @@
 import io
 import json
 import zipfile
+from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
 
 from fraeno.github_app.client import GitHubApiError, GitHubClient
-from fraeno.github_app.settings import AppSettings
+from fraeno.github_app.settings import AppSettings, CredentialRotationWindow
 
 
 def client_with(handler: httpx.MockTransport) -> GitHubClient:
@@ -232,6 +233,85 @@ async def test_app_delivery_redelivery_uses_app_jwt_endpoint(
         ("GET", "/app/hook/deliveries/812"),
         ("POST", "/app/hook/deliveries/812/attempts"),
     ]
+
+
+@pytest.mark.anyio
+async def test_app_auth_falls_back_to_previous_key_during_rotation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "fraeno.github_app.client.create_app_jwt",
+        lambda app_id, private_key: f"jwt-{app_id}-{private_key}",
+    )
+    tokens: list[str] = []
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        token = request.headers["authorization"]
+        tokens.append(token)
+        if token.endswith("active-key"):
+            return httpx.Response(401)
+        return httpx.Response(200, json={"token": "installation-token"})
+
+    now = datetime.now(timezone.utc)
+    settings = AppSettings(
+        app_id="1",
+        private_key="active-key",
+        previous_private_key="previous-key",
+        credential_rotation=CredentialRotationWindow(
+            started_at=now - timedelta(minutes=1),
+            previous_valid_until=now + timedelta(minutes=1),
+        ),
+        github_api_url="https://github.test",
+    )
+    client = GitHubClient(
+        settings,
+        httpx.AsyncClient(
+            base_url=settings.github_api_url,
+            transport=httpx.MockTransport(respond),
+        ),
+    )
+
+    token = await client.installation_token(7, 9)
+    await client.close()
+
+    assert token == "installation-token"
+    assert tokens == ["Bearer jwt-1-active-key", "Bearer jwt-1-previous-key"]
+
+
+@pytest.mark.anyio
+async def test_app_auth_does_not_fall_back_after_rotation_expires(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "fraeno.github_app.client.create_app_jwt",
+        lambda app_id, private_key: f"jwt-{app_id}-{private_key}",
+    )
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    now = datetime.now(timezone.utc)
+    settings = AppSettings(
+        app_id="1",
+        private_key="active-key",
+        previous_private_key="previous-key",
+        credential_rotation=CredentialRotationWindow(
+            started_at=now - timedelta(minutes=2),
+            previous_valid_until=now - timedelta(minutes=1),
+        ),
+        github_api_url="https://github.test",
+    )
+    client = GitHubClient(
+        settings,
+        httpx.AsyncClient(
+            base_url=settings.github_api_url,
+            transport=httpx.MockTransport(respond),
+        ),
+    )
+
+    with pytest.raises(GitHubApiError, match="401"):
+        await client.installation_token(7, 9)
+    await client.close()
 
 
 @pytest.mark.anyio

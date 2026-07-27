@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import zipfile
 from dataclasses import dataclass
 from typing import Any
@@ -10,6 +11,8 @@ import httpx
 
 from fraeno.github_app.auth import create_app_jwt
 from fraeno.github_app.settings import AppSettings
+
+LOGGER = logging.getLogger(__name__)
 
 
 class GitHubApiError(RuntimeError):
@@ -74,12 +77,9 @@ class GitHubClient:
     async def installation_token(
         self, installation_id: int, repository_id: int
     ) -> str:
-        response = await self._request(
+        response = await self._app_request(
             "POST",
             f"/app/installations/{installation_id}/access_tokens",
-            token=create_app_jwt(
-                self.settings.app_id, self.settings.private_key
-            ),
             json={
                 "repository_ids": [repository_id],
                 "permissions": {
@@ -259,17 +259,88 @@ class GitHubClient:
             ) from error
 
     async def app_delivery(self, github_delivery_id: int) -> dict[str, Any]:
-        return await self._request(
+        return await self._app_request(
             "GET",
             f"/app/hook/deliveries/{github_delivery_id}",
-            token=create_app_jwt(self.settings.app_id, self.settings.private_key),
         )
 
     async def redeliver_app_delivery(self, github_delivery_id: int) -> None:
-        await self._request(
+        await self._app_request(
             "POST",
             f"/app/hook/deliveries/{github_delivery_id}/attempts",
-            token=create_app_jwt(self.settings.app_id, self.settings.private_key),
+        )
+
+    async def credential_readiness(self) -> dict[str, Any]:
+        await self._request(
+            "GET",
+            "/app",
+            token=create_app_jwt(
+                self.settings.app_id, self.settings.private_key
+            ),
+        )
+        previous_configured = bool(self.settings.previous_private_key)
+        overlap_active = bool(
+            previous_configured
+            and self.settings.credential_rotation is not None
+            and self.settings.credential_rotation.accepts_previous()
+        )
+        previous_valid = False
+        if overlap_active:
+            await self._request(
+                "GET",
+                "/app",
+                token=create_app_jwt(
+                    self.settings.app_id,
+                    self.settings.previous_private_key,
+                ),
+            )
+            previous_valid = True
+        return {
+            "status": "ok",
+            "active_key_valid": True,
+            "previous_key_configured": previous_configured,
+            "overlap_active": overlap_active,
+            "previous_key_valid": previous_valid,
+        }
+
+    async def _app_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: dict[str, Any] | None = None,
+        params: dict[str, str] | None = None,
+        allowed_statuses: set[int] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return await self._request(
+                method,
+                path,
+                token=create_app_jwt(
+                    self.settings.app_id, self.settings.private_key
+                ),
+                json=json,
+                params=params,
+                allowed_statuses=allowed_statuses,
+            )
+        except GitHubApiError as error:
+            if (
+                error.status_code != 401
+                or not self.settings.previous_private_key
+                or self.settings.credential_rotation is None
+                or not self.settings.credential_rotation.accepts_previous()
+            ):
+                raise
+        LOGGER.warning("GitHub App authentication used the previous key")
+        return await self._request(
+            method,
+            path,
+            token=create_app_jwt(
+                self.settings.app_id, self.settings.previous_private_key
+            ),
+            json=json,
+            params=params,
+            allowed_statuses=allowed_statuses,
         )
 
     async def pull_request(

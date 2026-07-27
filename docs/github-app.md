@@ -57,6 +57,14 @@ FRAENO_WORKER_URL
 FRAENO_TASK_SERVICE_ACCOUNT
 ```
 
+During a reviewed credential rotation, the webhook also receives:
+
+```text
+FRAENO_GITHUB_WEBHOOK_SECRET_PREVIOUS
+FRAENO_CREDENTIAL_ROTATION_STARTED_AT
+FRAENO_PREVIOUS_CREDENTIALS_VALID_UNTIL
+```
+
 The private `fraeno-worker` service performs GitHub API work and stores
 correlation state. It requires:
 
@@ -75,6 +83,14 @@ FRAENO_REPOSITORY_RETENTION_DAYS=30
 FRAENO_REPLAY_AUDIT_RETENTION_DAYS=90
 ```
 
+During the same rotation, the worker also receives:
+
+```text
+FRAENO_GITHUB_PRIVATE_KEY_PREVIOUS
+FRAENO_CREDENTIAL_ROTATION_STARTED_AT
+FRAENO_PREVIOUS_CREDENTIALS_VALID_UNTIL
+```
+
 The Cloud Tasks service account is the only invoker of the worker. The webhook
 service can enqueue tasks but cannot invoke the worker directly. Never commit
 the PEM private key or webhook secret.
@@ -83,6 +99,12 @@ The configured Cloud Tasks maximum attempts should equal
 `FRAENO_MAX_DELIVERY_ATTEMPTS`. Fraeno marks the last failed attempt as a dead
 letter and returns success to Cloud Tasks, which prevents an unbounded retry
 loop.
+
+Credential rotation uses exact Secret Manager versions, tagged zero-traffic
+Cloud Run revisions, and a maximum one-hour overlap. Follow
+[`credential-rotation.md`](credential-rotation.md). Never remove the previous
+webhook secret or App key until a new signed GitHub delivery and successful
+installation checks authorize retirement.
 
 ## Repository readiness
 
