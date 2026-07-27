@@ -11,7 +11,9 @@ class SiteParser(HTMLParser):
         self.links: list[str] = []
         self.canonical: str | None = None
         self.title_parts: list[str] = []
+        self.body_parts: list[str] = []
         self._in_title = False
+        self._in_body = False
 
     def handle_starttag(
         self, tag: str, attrs: list[tuple[str, str | None]]
@@ -19,6 +21,8 @@ class SiteParser(HTMLParser):
         attributes = dict(attrs)
         if tag == "title":
             self._in_title = True
+        if tag == "body":
+            self._in_body = True
         if tag in {"a", "link", "script", "img"}:
             target = attributes.get("href") or attributes.get("src")
             if target is not None:
@@ -29,10 +33,14 @@ class SiteParser(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         if tag == "title":
             self._in_title = False
+        if tag == "body":
+            self._in_body = False
 
     def handle_data(self, data: str) -> None:
         if self._in_title:
             self.title_parts.append(data)
+        if self._in_body:
+            self.body_parts.append(data)
 
 
 def test_site_has_expected_identity_and_local_assets() -> None:
@@ -57,3 +65,16 @@ def test_site_preserves_approved_product_copy() -> None:
     ) in page
     assert "essentially, dependabot for robots + integration testing." in page
     assert "A passing result means the configured target and declared probes passed." in page
+
+
+def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None:
+    parser = SiteParser()
+    parser.feed((SITE / "index.html").read_text())
+    visible_text = " ".join(parser.body_parts)
+    styles = (SITE / "styles.css").read_text()
+
+    assert "color-scheme: light" in styles
+    assert "prefers-reduced-motion" in styles
+    assert "—" not in visible_text
+    assert ":" not in visible_text
+    assert "A DeepUbuntu product" not in visible_text
