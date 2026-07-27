@@ -103,6 +103,9 @@ def test_release_workflow_tests_and_gates_before_publish() -> None:
 
 def test_release_workflow_publishes_only_create_once_tags_and_digest_evidence() -> None:
     workflow = RELEASE_WORKFLOW.read_text()
+    external_runner_test = (
+        ROOT / "tests" / "container" / "test-external-runner.sh"
+    ).read_text()
 
     assert '--tag "$RUNNER_IMAGE:v$RELEASE_VERSION"' in workflow
     assert '--tag "$RUNNER_IMAGE:$RELEASE_SHA"' in workflow
@@ -114,6 +117,21 @@ def test_release_workflow_publishes_only_create_once_tags_and_digest_evidence() 
     assert "sha256sum fraeno-runner-release.json" in workflow
     assert "PREVIOUS_DIGEST" in workflow
     assert "tests/container/test-external-runner.sh" in workflow
+    exact_runner_step = workflow[
+        workflow.index("Build and test the exact runner") :
+        workflow.index("Require every release check")
+    ]
+    rollback_step = workflow[
+        workflow.index("Test the protected rollback image") :
+        workflow.index("Set up Buildx for attestations")
+    ]
+    assert '"$RELEASE_VERSION"' in exact_runner_step
+    assert 'rollback_version="$(' in rollback_step
+    assert '"$rollback_version"' in rollback_step
+    assert "Protected rollback image has no semantic version label." in rollback_step
+    assert "org.opencontainers.image.version" in external_runner_test
+    assert 'version": sys.argv[2]' in external_runner_test
+    assert 'version": "0.2.0"' not in external_runner_test
     assert 'release_tree="$(git rev-parse "$RELEASE_SHA^{tree}")"' in workflow
     assert 'if [[ "$reviewed_tree" != "$release_tree" ]]' in workflow
     assert "--reviewed-input reviewed-check-runs.json" in workflow

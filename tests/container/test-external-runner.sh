@@ -1,12 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "$#" -ne 1 ]]; then
-  echo "usage: test-external-runner.sh IMAGE" >&2
+if [[ "$#" -ne 2 ]]; then
+  echo "usage: test-external-runner.sh IMAGE EXPECTED_VERSION" >&2
   exit 2
 fi
 
 image_id="$(docker image inspect --format '{{.Id}}' "$1")"
+image_version="$(
+  docker image inspect \
+    --format '{{index .Config.Labels "org.opencontainers.image.version"}}' \
+    "$image_id"
+)"
+expected_version="$2"
+if [[ "$image_version" != "$expected_version" ]]; then
+  echo "runner image version does not match the requested version" >&2
+  exit 1
+fi
+semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+if [[ ! "$expected_version" =~ $semver ]]; then
+  echo "runner image does not have a semantic version label" >&2
+  exit 1
+fi
 entrypoint="$(
   docker image inspect --format '{{join .Config.Entrypoint " "}}' "$image_id"
 )"
@@ -18,6 +33,11 @@ docker run --rm --entrypoint /ros_entrypoint.sh "$image_id" \
   python3 -c 'import rclpy'
 docker run --rm --entrypoint /ros_entrypoint.sh "$image_id" \
   python3 -m pip --version
+reported_version="$(docker run --rm "$image_id" --version)"
+if [[ "$reported_version" != "$expected_version" ]]; then
+  echo "runner CLI version does not match its image version" >&2
+  exit 1
+fi
 
 repository_fixture="$PWD/tests/fixtures/external_ros2_repository"
 hostile_fixture="$PWD/tests/fixtures/hostile_candidate"
@@ -43,12 +63,12 @@ bash runner/run-isolated-validation.sh \
   "$test_root/baseline/.fraeno.yml" \
   "$test_root/safe-report.json"
 
-python3 - "$test_root/safe-report.json" <<'PY'
+python3 - "$test_root/safe-report.json" "$expected_version" <<'PY'
 import json
 import sys
 
 report = json.load(open(sys.argv[1]))
-assert report["engine"] == {"name": "fraeno", "version": "0.2.0"}
+assert report["engine"] == {"name": "fraeno", "version": sys.argv[2]}
 assert report["outcome"] == "pass"
 PY
 
@@ -63,12 +83,12 @@ hostile_status=$?
 set -e
 test "$hostile_status" -eq 1
 
-python3 - "$test_root/hostile-report.json" <<'PY'
+python3 - "$test_root/hostile-report.json" "$expected_version" <<'PY'
 import json
 import sys
 
 report = json.load(open(sys.argv[1]))
-assert report["engine"] == {"name": "fraeno", "version": "0.2.0"}
+assert report["engine"] == {"name": "fraeno", "version": sys.argv[2]}
 assert report["outcome"] == "block"
 attempts = report["candidate"]["observation"]["metadata"][
     "protected_write_attempts_succeeded"
