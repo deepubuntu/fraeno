@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import json
+from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from google.api_core.exceptions import AlreadyExists
@@ -47,14 +47,7 @@ class CloudTasksEnqueuer:
             self.settings.gcp_location,
             self.settings.queue_name,
         )
-        task_id = f"github-{hashlib.sha256(delivery_id.encode()).hexdigest()}"
         task = {
-            "name": self._client.task_path(
-                self.settings.gcp_project,
-                self.settings.gcp_location,
-                self.settings.queue_name,
-                task_id,
-            ),
             "http_request": {
                 "http_method": tasks_v2.HttpMethod.POST,
                 "url": f"{self.settings.worker_url}/internal/github-events",
@@ -67,6 +60,7 @@ class CloudTasksEnqueuer:
                     {
                         "event": event,
                         "delivery_id": delivery_id,
+                        "enqueued_at": datetime.now(timezone.utc).isoformat(),
                         "payload": payload,
                     },
                     separators=(",", ":"),

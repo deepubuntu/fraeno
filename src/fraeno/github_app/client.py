@@ -13,9 +13,16 @@ from fraeno.github_app.settings import AppSettings
 
 
 class GitHubApiError(RuntimeError):
-    def __init__(self, message: str, *, retryable: bool = False) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool = False,
+        status_code: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.retryable = retryable
+        self.status_code = status_code
 
 
 @dataclass(frozen=True)
@@ -28,6 +35,9 @@ class CheckRun:
 class WorkflowRun:
     id: int
     html_url: str
+    status: str = ""
+    conclusion: str = ""
+    path: str = ""
 
 
 @dataclass(frozen=True)
@@ -205,8 +215,62 @@ class GitHubClient:
                 return WorkflowRun(
                     id=int(raw_run["id"]),
                     html_url=str(raw_run["html_url"]),
+                    status=str(raw_run.get("status", "")),
+                    conclusion=str(raw_run.get("conclusion") or ""),
+                    path=str(raw_run.get("path") or ""),
                 )
         return None
+
+    async def workflow_available(
+        self,
+        repository: str,
+        installation_token: str,
+    ) -> bool:
+        response = await self._request(
+            "GET",
+            f"/repos/{repository}/actions/workflows/{self.settings.workflow_file}",
+            token=installation_token,
+            allowed_statuses={404},
+        )
+        return bool(response)
+
+    async def workflow_run(
+        self,
+        repository: str,
+        workflow_run_id: int,
+        installation_token: str,
+    ) -> WorkflowRun:
+        response = await self._request(
+            "GET",
+            f"/repos/{repository}/actions/runs/{workflow_run_id}",
+            token=installation_token,
+        )
+        try:
+            return WorkflowRun(
+                id=int(response["id"]),
+                html_url=str(response["html_url"]),
+                status=str(response["status"]),
+                conclusion=str(response.get("conclusion") or ""),
+                path=str(response.get("path") or ""),
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise GitHubApiError(
+                "GitHub returned a malformed workflow run"
+            ) from error
+
+    async def app_delivery(self, github_delivery_id: int) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            f"/app/hook/deliveries/{github_delivery_id}",
+            token=create_app_jwt(self.settings.app_id, self.settings.private_key),
+        )
+
+    async def redeliver_app_delivery(self, github_delivery_id: int) -> None:
+        await self._request(
+            "POST",
+            f"/app/hook/deliveries/{github_delivery_id}/attempts",
+            token=create_app_jwt(self.settings.app_id, self.settings.private_key),
+        )
 
     async def pull_request(
         self,
@@ -253,7 +317,7 @@ class GitHubClient:
             "POST",
             f"/repos/{repository}/actions/runs/{workflow_run_id}/cancel",
             token=installation_token,
-            allowed_statuses={409},
+            allowed_statuses={404, 409},
         )
 
     async def validation_report(
@@ -385,6 +449,7 @@ class GitHubClient:
                     response.status_code in {408, 429}
                     or response.status_code >= 500
                 ),
+                status_code=response.status_code,
             )
         if not response.content:
             return {}
@@ -425,5 +490,6 @@ class GitHubClient:
                     response.status_code in {408, 429}
                     or response.status_code >= 500
                 ),
+                status_code=response.status_code,
             )
         return response.content

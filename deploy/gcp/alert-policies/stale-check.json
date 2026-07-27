@@ -1,0 +1,24 @@
+{
+  "displayName": "Fraeno found a stale GitHub check",
+  "documentation": {
+    "content": "The scheduled recovery pass found a check without a recent completion event. Fraeno will reconcile it against GitHub.",
+    "mimeType": "text/markdown"
+  },
+  "conditions": [
+    {
+      "displayName": "A stale check was reconciled",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" AND jsonPayload.fraeno_metric=\"stale_check\""
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": false,
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "1800s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": []
+}

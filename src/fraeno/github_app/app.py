@@ -5,6 +5,7 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
@@ -12,6 +13,8 @@ from fastapi import FastAPI, HTTPException, Request, Response, status
 from fraeno.github_app.auth import verify_webhook_signature
 from fraeno.github_app.client import GitHubClient
 from fraeno.github_app.handler import EventHandler
+from fraeno.github_app.metrics import JsonLogMetricSink, MetricSink
+from fraeno.github_app.recovery import Reconciler
 from fraeno.github_app.settings import AppSettings, SettingsError, WebhookSettings
 from fraeno.github_app.store import FirestoreEventStore
 from fraeno.github_app.tasks import CloudTasksEnqueuer, TaskEnqueuer
@@ -20,8 +23,16 @@ LOGGER = logging.getLogger(__name__)
 MAX_REQUEST_BYTES = 1_000_000
 
 
-def build_handler(settings: AppSettings) -> EventHandler:
-    return EventHandler(GitHubClient(settings), FirestoreEventStore())
+def build_handler(
+    settings: AppSettings, metrics: MetricSink | None = None
+) -> EventHandler:
+    return EventHandler(
+        GitHubClient(settings),
+        FirestoreEventStore(
+            delivery_retention_days=settings.delivery_retention_days
+        ),
+        metrics,
+    )
 
 
 def request_too_large(request: Request) -> bool:
@@ -52,8 +63,10 @@ async def json_object(request: Request) -> dict[str, Any]:
 def create_webhook_app(
     settings: WebhookSettings | None = None,
     enqueuer: TaskEnqueuer | None = None,
+    metrics: MetricSink | None = None,
 ) -> FastAPI:
     resolved_settings = settings
+    active_metrics = metrics or JsonLogMetricSink()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -107,6 +120,7 @@ def create_webhook_app(
             request.headers.get("x-hub-signature-256"),
             active_settings.webhook_secret,
         ):
+            active_metrics.emit("signature_rejection")
             raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
         event = request.headers.get("x-github-event", "")
@@ -129,8 +143,11 @@ def create_webhook_app(
 def create_worker_app(
     settings: AppSettings | None = None,
     handler: EventHandler | None = None,
+    reconciler: Reconciler | None = None,
+    metrics: MetricSink | None = None,
 ) -> FastAPI:
     resolved_settings = settings
+    active_metrics = metrics or JsonLogMetricSink()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -142,8 +159,20 @@ def create_worker_app(
             except SettingsError as error:
                 LOGGER.warning("Fraeno worker is not configured: %s", error)
         if app.state.handler is None and resolved_settings is not None:
-            app.state.handler = build_handler(resolved_settings)
+            app.state.handler = build_handler(resolved_settings, active_metrics)
             created_handler = True
+        if (
+            app.state.reconciler is None
+            and isinstance(app.state.handler, EventHandler)
+            and resolved_settings is not None
+        ):
+            app.state.reconciler = Reconciler(
+                app.state.handler.client,
+                app.state.handler.store,
+                app.state.handler,
+                resolved_settings,
+                active_metrics,
+            )
         try:
             yield
         finally:
@@ -159,6 +188,7 @@ def create_worker_app(
         openapi_url=None,
     )
     app.state.handler = handler
+    app.state.reconciler = reconciler
 
     @app.get("/health")
     async def health() -> dict[str, Any]:
@@ -189,22 +219,58 @@ def create_worker_app(
             raise HTTPException(status_code=400, detail="Invalid event envelope")
         raw_retry_count = request.headers.get("x-cloudtasks-taskretrycount", "0")
         try:
-            retry = int(raw_retry_count) > 0
+            retry_count = int(raw_retry_count)
         except ValueError:
             raise HTTPException(
                 status_code=400, detail="Invalid Cloud Tasks retry count"
             ) from None
+        retry = retry_count > 0
+        if retry:
+            active_metrics.emit("delivery_retry", float(retry_count))
+        enqueued_at = envelope.get("enqueued_at")
+        if isinstance(enqueued_at, str):
+            try:
+                queued_at = datetime.fromisoformat(enqueued_at)
+                queue_delay = max(
+                    0.0,
+                    (datetime.now(timezone.utc) - queued_at).total_seconds(),
+                )
+            except ValueError:
+                pass
+            else:
+                active_metrics.emit("queue_delay_seconds", queue_delay)
         if not await active_handler.store.claim_delivery(
-            delivery_id, retry=retry
+            delivery_id, event=event, retry=retry
         ):
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         try:
             await active_handler.process(event, delivery_id, payload)
         except Exception as error:
+            active_settings = resolved_settings
+            if (
+                active_settings is not None
+                and retry_count + 1 >= active_settings.max_delivery_attempts
+            ):
+                await active_handler.store.dead_letter_delivery(
+                    delivery_id,
+                    error_kind=type(error).__name__,
+                )
+                return Response(status_code=status.HTTP_204_NO_CONTENT)
             raise HTTPException(
                 status_code=500, detail="Event processing failed"
             ) from error
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @app.post("/internal/reconcile")
+    async def reconcile(request: Request) -> dict[str, int]:
+        active_reconciler: Reconciler | None = app.state.reconciler
+        if active_reconciler is None:
+            raise HTTPException(status_code=503, detail="Reconciler is not configured")
+        if request.headers.get("x-cloudscheduler") != "true":
+            raise HTTPException(
+                status_code=403, detail="Cloud Scheduler request required"
+            )
+        return (await active_reconciler.reconcile()).to_dict()
 
     return app
 

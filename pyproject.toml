@@ -37,6 +37,7 @@ dev = [
 [project.scripts]
 fraeno = "fraeno.cli:main"
 fraeno-fixture-observe = "fraeno.fixture_observer:main"
+fraeno-github-ops = "fraeno.github_app.operations:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fraeno"]

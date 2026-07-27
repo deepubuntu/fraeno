@@ -39,7 +39,7 @@ def settings() -> WebhookSettings:
 
 
 @pytest.mark.anyio
-async def test_cloud_task_is_deterministic_and_oidc_authenticated() -> None:
+async def test_cloud_task_is_oidc_authenticated_and_replayable() -> None:
     client = FakeTasksClient()
     enqueuer = CloudTasksEnqueuer(settings(), client)
 
@@ -51,17 +51,15 @@ async def test_cloud_task_is_deterministic_and_oidc_authenticated() -> None:
 
     assert created is True
     task = client.requests[0]["task"]
-    assert task["name"].startswith(
-        "projects/deepubuntu/locations/us-central1/queues/events/tasks/github-"
-    )
+    assert "name" not in task
     request = task["http_request"]
     assert request["url"] == "https://worker.example/internal/github-events"
     assert request["oidc_token"]["audience"] == "https://worker.example"
-    assert json.loads(request["body"]) == {
-        "event": "pull_request",
-        "delivery_id": "delivery-1",
-        "payload": {"action": "opened"},
-    }
+    body = json.loads(request["body"])
+    assert body["event"] == "pull_request"
+    assert body["delivery_id"] == "delivery-1"
+    assert body["payload"] == {"action": "opened"}
+    assert body["enqueued_at"].endswith("+00:00")
 
 
 @pytest.mark.anyio

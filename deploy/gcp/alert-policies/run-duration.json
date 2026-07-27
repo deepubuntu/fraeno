@@ -1,0 +1,24 @@
+{
+  "displayName": "Fraeno validation ran longer than expected",
+  "documentation": {
+    "content": "A completed robot validation took at least one hour. Check runner startup, simulation time, and GitHub Actions capacity.",
+    "mimeType": "text/markdown"
+  },
+  "conditions": [
+    {
+      "displayName": "Completed run reached one hour",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" AND jsonPayload.fraeno_metric=\"run_duration_seconds\" AND jsonPayload.value>=3600"
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": false,
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "1800s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": []
+}

@@ -162,6 +162,79 @@ async def test_workflow_recovery_uses_unique_run_title() -> None:
 
 
 @pytest.mark.anyio
+async def test_repository_readiness_distinguishes_missing_workflow() -> None:
+    async def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/fraeno-validation.yml"):
+            return httpx.Response(404)
+        return httpx.Response(500)
+
+    client = client_with(httpx.MockTransport(respond))
+    available = await client.workflow_available(
+        "deepubuntu/customer-robot", "token"
+    )
+    await client.close()
+
+    assert available is False
+
+
+@pytest.mark.anyio
+async def test_workflow_state_can_be_reconciled_after_lost_webhook() -> None:
+    async def respond(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/actions/runs/300")
+        return httpx.Response(
+            200,
+            json={
+                "id": 300,
+                "html_url": "https://github.test/runs/300",
+                "status": "completed",
+                "conclusion": "success",
+                "path": ".github/workflows/fraeno-validation.yml",
+            },
+        )
+
+    client = client_with(httpx.MockTransport(respond))
+    run = await client.workflow_run("deepubuntu/fraeno", 300, "token")
+    await client.close()
+
+    assert run.status == "completed"
+    assert run.conclusion == "success"
+
+
+@pytest.mark.anyio
+async def test_app_delivery_redelivery_uses_app_jwt_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "fraeno.github_app.client.create_app_jwt",
+        lambda app_id, private_key: f"jwt-{app_id}-{private_key}",
+    )
+    requests: list[tuple[str, str]] = []
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "id": 812,
+                    "guid": "91c2d46f-17b2-4d9d-aa0d-100e079c0c20",
+                },
+            )
+        return httpx.Response(202)
+
+    client = client_with(httpx.MockTransport(respond))
+    delivery = await client.app_delivery(812)
+    await client.redeliver_app_delivery(812)
+    await client.close()
+
+    assert delivery["guid"] == "91c2d46f-17b2-4d9d-aa0d-100e079c0c20"
+    assert requests == [
+        ("GET", "/app/hook/deliveries/812"),
+        ("POST", "/app/hook/deliveries/812/attempts"),
+    ]
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     ("status_code", "retryable"),
     [(403, False), (429, True), (503, True)],
