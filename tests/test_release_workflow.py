@@ -67,11 +67,15 @@ def test_release_docs_name_only_the_public_runner_repository() -> None:
 def test_release_workflow_tests_and_gates_before_publish() -> None:
     workflow = RELEASE_WORKFLOW.read_text()
 
+    python_position = workflow.index("Set up Python")
+    identity_position = workflow.index("Validate release identity")
     test_position = workflow.index("Test the exact release commit")
     container_position = workflow.index("Build and test the exact runner")
     gate_position = workflow.index("Require every release check")
     auth_position = workflow.index("Authenticate to Google Cloud")
     publish_position = workflow.index("Publish immutable runner")
+    assert 'python-version: "3.11"' in workflow
+    assert python_position < identity_position
     assert test_position < auth_position
     assert container_position < auth_position
     assert gate_position < auth_position
