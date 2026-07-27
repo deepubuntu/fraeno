@@ -107,6 +107,8 @@ def test_customer_template_has_no_internal_fixture_dependency() -> None:
 
     assert "FRAENO_RUNNER_IMAGE" in workflow
     assert "@sha256:" in workflow
+    assert "inputs.base_repository" in workflow
+    assert "inputs.head_repository" in workflow
     assert "fixtures/ros2_qos_robot" not in workflow
     assert "src/fraeno" not in workflow
 
