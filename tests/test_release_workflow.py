@@ -63,6 +63,11 @@ def test_release_docs_name_only_the_public_runner_repository() -> None:
     assert "`us-central1`, and `fraeno-runner`" in release_docs
     assert "update fraeno-runner" in release_docs
     assert "private mixed `fraeno`" in release_docs
+    assert "`deepubuntu/fraeno`" in release_docs
+    assert "`refs/heads/main`" in release_docs
+    assert "`Publish immutable Fraeno runner`" in release_docs
+    assert "`workflow_dispatch`" in release_docs
+    assert "job_workflow_ref" not in release_docs
 
 
 def test_release_workflow_tests_and_gates_before_publish() -> None:
