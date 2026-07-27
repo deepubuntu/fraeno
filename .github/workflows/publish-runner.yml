@@ -41,9 +41,10 @@ jobs:
       GCP_REPOSITORY: ${{ vars.GCP_ARTIFACT_REGISTRY_REPOSITORY }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_RELEASE_SERVICE_ACCOUNT: ${{ vars.GCP_RELEASE_SERVICE_ACCOUNT }}
+      PYTHONPATH: src
     steps:
       - name: Check out the exact reviewed commit
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.commit_sha }}
           fetch-depth: 0
@@ -51,7 +52,7 @@ jobs:
 
       - name: Validate release identity
         run: |
-          python scripts/release_safety.py validate-inputs \
+          python -m fraeno.release_safety validate-inputs \
             --version "$RELEASE_VERSION" \
             --commit-sha "$RELEASE_SHA" \
             --previous-digest "$PREVIOUS_DIGEST"
@@ -69,7 +70,7 @@ jobs:
           PY
 
       - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.10"
           cache: pip
@@ -101,7 +102,7 @@ jobs:
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "/repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/pulls" \
             > associated-pulls.json
-          python scripts/release_safety.py select-reviewed-pr \
+          python -m fraeno.release_safety select-reviewed-pr \
             --input associated-pulls.json \
             --commit-sha "$RELEASE_SHA" \
             --output reviewed-pr.json
@@ -135,7 +136,7 @@ jobs:
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "/repos/$GITHUB_REPOSITORY/commits/$reviewed_sha/check-runs?per_page=100" \
             > reviewed-check-runs.json
-          python scripts/release_safety.py verify-checks \
+          python -m fraeno.release_safety verify-checks \
             --input release-check-runs.json \
             --reviewed-input reviewed-check-runs.json \
             --commit-sha "$RELEASE_SHA" \
@@ -158,13 +159,13 @@ jobs:
           done
 
       - name: Authenticate to Google Cloud with workload identity
-        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_RELEASE_SERVICE_ACCOUNT }}
 
       - name: Set up Google Cloud
-        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
@@ -241,7 +242,7 @@ jobs:
             --push \
             .
           digest="$(
-            python scripts/release_safety.py extract-digest \
+            python -m fraeno.release_safety extract-digest \
               --input buildkit-metadata.json
           )"
           echo "RUNNER_DIGEST=$digest" >> "$GITHUB_ENV"
@@ -264,7 +265,7 @@ jobs:
           test "$commit_digest" = "$RUNNER_DIGEST"
           docker buildx imagetools inspect \
             "$RUNNER_IMAGE@$RUNNER_DIGEST" >/dev/null
-          python scripts/release_safety.py write-manifest \
+          python -m fraeno.release_safety write-manifest \
             --version "$RELEASE_VERSION" \
             --commit-sha "$RELEASE_SHA" \
             --image "$RUNNER_IMAGE" \

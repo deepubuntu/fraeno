@@ -52,7 +52,7 @@ def test_release_workflow_tests_and_gates_before_publish() -> None:
         "ros-integration",
         "test",
     ):
-        assert check in (ROOT / "scripts" / "release_safety.py").read_text()
+        assert check in (ROOT / "src" / "fraeno" / "release_safety.py").read_text()
 
 
 def test_release_workflow_publishes_only_create_once_tags_and_digest_evidence() -> None:

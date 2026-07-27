@@ -68,16 +68,16 @@ def require_successful_checks(
     failures: list[str] = []
     selected: dict[str, dict[str, Any]] = {}
     for name in required:
-        run = newest.get(name)
-        if run is None:
+        selected_run = newest.get(name)
+        if selected_run is None:
             failures.append(f"{name}: missing")
             continue
-        status = run.get("status")
-        conclusion = run.get("conclusion")
+        status = selected_run.get("status")
+        conclusion = selected_run.get("conclusion")
         if status != "completed" or conclusion != "success":
             failures.append(f"{name}: {status}/{conclusion}")
             continue
-        selected[name] = run
+        selected[name] = selected_run
     if failures:
         raise ReleaseSafetyError(
             "release checks are not all green: " + ", ".join(failures)

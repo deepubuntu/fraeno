@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.release_safety import (
+from fraeno.release_safety import (
     REQUIRED_CHECKS,
     ReleaseSafetyError,
     build_release_manifest,

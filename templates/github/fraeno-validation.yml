@@ -55,7 +55,7 @@ jobs:
           fi
 
       - name: Check out trusted baseline
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           repository: ${{ inputs.base_repository }}
           ref: ${{ inputs.base_sha }}
@@ -63,7 +63,7 @@ jobs:
           persist-credentials: false
 
       - name: Check out candidate
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           repository: ${{ inputs.head_repository }}
           ref: ${{ inputs.head_sha }}
