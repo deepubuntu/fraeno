@@ -11,3 +11,4 @@ install/
 log/
 .fraeno/
 fraeno-report.json
+fraeno-*-report.json

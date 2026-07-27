@@ -7,13 +7,14 @@ name = "fraeno"
 version = "0.1.0"
 description = "Robot dependency updates with complete-system integration testing."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Thabhelo Duve" }]
 dependencies = [
   "httpx>=0.27,<1",
   "packaging>=24.1,<27",
   "PyYAML>=6.0.2,<7",
+  "tomli>=2.0,<3",
 ]
 
 [project.optional-dependencies]
@@ -45,12 +46,12 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.10"
 strict = true
 packages = ["fraeno"]

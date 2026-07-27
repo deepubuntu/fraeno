@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +17,7 @@ def build_lockfile(report: ScanReport, root: Path) -> dict[str, Any]:
 
     return {
         "schema_version": 1,
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "dependencies": [dependency.to_dict() for dependency in report.dependencies],
         "source_hashes": source_hashes,
         "warnings": report.warnings,

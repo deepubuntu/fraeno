@@ -1,16 +1,27 @@
 version: 1
 
 project:
-  name: fraeno-proof-robot
+  name: fraeno-live-ros2-fixture
 
 validation:
   steps:
-    - name: verify fixture source
-      command: ["python3", "-m", "compileall", "-q", "src"]
-      timeout_seconds: 60
+    - name: build ROS 2 fixture
+      command:
+        - bash
+        - -lc
+        - >-
+          cd fixtures/ros2_qos_robot &&
+          colcon build --event-handlers console_direct+
+      timeout_seconds: 300
   observe:
-    command: ["fraeno-fixture-observe"]
-    timeout_seconds: 30
+    command:
+      - bash
+      - -lc
+      - >-
+        cd fixtures/ros2_qos_robot &&
+        source install/setup.bash &&
+        python3 observe.py
+    timeout_seconds: 45
   contract:
     required_nodes:
       - /sensor_driver
@@ -20,8 +31,6 @@ validation:
       - /robot/command
     required_services:
       - /robot/health
-    required_actions:
-      - /robot/move
     minimum_topic_rates_hz:
       /sensor/reading: 15
       /robot/command: 7

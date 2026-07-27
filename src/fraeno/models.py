@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from enum import StrEnum
+from enum import Enum
 from typing import Any
 
 
-class Ecosystem(StrEnum):
+class Ecosystem(str, Enum):
     ROS = "ros"
     CMAKE = "cmake"
     PYTHON = "python"

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from enum import StrEnum
+from enum import Enum
 from typing import Any
 
 from fraeno.config import ValidationConfig
 from fraeno.validation.observation import QosProfile, SystemObservation, TopicObservation
 
 
-class Outcome(StrEnum):
+class Outcome(str, Enum):
     PASS = "pass"
     BLOCK = "block"
     ERROR = "error"
