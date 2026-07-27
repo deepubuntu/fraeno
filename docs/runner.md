@@ -54,8 +54,8 @@ comparison container.
 ## Trusted observation
 
 Fraeno loads `.fraeno.yml` from the base commit for both runs. The runner exposes
-the base source at `FRAENO_TRUSTED_ROOT`. A repository-specific observer can be
-called from that path:
+the base source at `FRAENO_TRUSTED_ROOT`. The generic observer can use that
+trusted contract after the workspace environment is loaded:
 
 ```yaml
 validation:
@@ -63,10 +63,25 @@ validation:
     command:
       - bash
       - -lc
-      - python3 "$FRAENO_TRUSTED_ROOT/observe.py"
+      - >-
+        source install/setup.bash &&
+        fraeno observe-ros2 --config "$FRAENO_TRUSTED_ROOT/.fraeno.yml"
+    ros2:
+      launch_command: [ros2, launch, my_robot_bringup, system.launch.py]
+      warmup_seconds: 2
+      graph_stabilization_timeout_seconds: 15
+      graph_stabilization_interval_seconds: 0.25
+      graph_stabilization_samples: 3
+      sample_seconds: 5
+      measurement_repetitions: 3
+      rate_topics: [/sensor/reading]
+      diagnostics_topics: [/diagnostics]
+      transform_topics: [/tf, /tf_static]
+      shutdown_timeout_seconds: 5
 ```
 
-This prevents a candidate from replacing the observer in its own commit.
+This prevents a candidate from weakening the observer settings in its own
+commit. A custom observer remains supported for hardware-specific evidence.
 
 ## Local proof
 

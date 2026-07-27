@@ -5,12 +5,38 @@ project:
 
 validation:
   steps:
-    - name: compile
-      command: ["python3", "-m", "compileall", "-q", "."]
-      timeout_seconds: 60
+    - name: build ROS 2 workspace
+      command: ["colcon", "build"]
+      timeout_seconds: 300
   observe:
-    command: ["python3", "observe.py"]
-    timeout_seconds: 30
+    command:
+      - bash
+      - -lc
+      - >-
+        source install/setup.bash &&
+        fraeno observe-ros2 --config "$FRAENO_TRUSTED_ROOT/.fraeno.yml"
+    timeout_seconds: 60
+    ros2:
+      launch_command:
+        - ros2
+        - launch
+        - my_robot_bringup
+        - system.launch.py
+      warmup_seconds: 2
+      graph_stabilization_timeout_seconds: 15
+      graph_stabilization_interval_seconds: 0.25
+      graph_stabilization_samples: 3
+      sample_seconds: 5
+      measurement_repetitions: 3
+      rate_topics:
+        - /sensor/reading
+        - /robot/command
+      diagnostics_topics:
+        - /diagnostics
+      transform_topics:
+        - /tf
+        - /tf_static
+      shutdown_timeout_seconds: 5
   contract:
     required_nodes:
       - /sensor_driver
@@ -20,7 +46,15 @@ validation:
       - /robot/command
     required_services:
       - /robot/health
+    required_actions:
+      - /robot/move
+    required_transforms:
+      - base_link->sensor_link
+    required_diagnostics:
+      - controller
     minimum_topic_rates_hz:
       /sensor/reading: 15
       /robot/command: 7
     maximum_topic_rate_regression_percent: 30
+    allowed_missing_baseline_entities:
+      - topic:/temporary/debug

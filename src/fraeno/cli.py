@@ -26,6 +26,7 @@ from fraeno.updates import (
 from fraeno.validation.compare import Outcome, compare_systems
 from fraeno.validation.contract import CapturedWorkspace, assemble_validation
 from fraeno.validation.observation import ObservationError, SystemObservation
+from fraeno.validation.ros2_observer import Ros2ObservationError, observe_ros2
 from fraeno.validation.runner import run_validation, run_workspace
 from fraeno.validation.sandbox import disposable_workspace, require_protected_output
 
@@ -124,6 +125,17 @@ def build_parser() -> argparse.ArgumentParser:
     assemble.add_argument(
         "--output", "-o", type=Path, default=Path("fraeno-report.json")
     )
+
+    observe_ros2_command = commands.add_parser(
+        "observe-ros2",
+        help="Launch and observe a configured ROS 2 system.",
+    )
+    observe_ros2_command.add_argument(
+        "--config",
+        type=Path,
+        default=Path(".fraeno.yml"),
+    )
+    observe_ros2_command.add_argument("--output", "-o", type=Path)
     return parser
 
 
@@ -150,7 +162,15 @@ def main(argv: list[str] | None = None) -> int:
             return _capture_workspace(args)
         if args.command == "assemble-report":
             return _assemble_report(args)
-    except (ConfigError, ObservationError, OSError, ValueError) as error:
+        if args.command == "observe-ros2":
+            return _observe_ros2(args)
+    except (
+        ConfigError,
+        ObservationError,
+        Ros2ObservationError,
+        OSError,
+        ValueError,
+    ) as error:
         print(f"fraeno: {error}", file=sys.stderr)
         return 2
     return 2
@@ -298,6 +318,15 @@ def _assemble_report(args: argparse.Namespace) -> int:
     )
     _write_json(result.to_dict(), args.output)
     return _outcome_code(result.outcome)
+
+
+def _observe_ros2(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    if config.validation.ros2_observer is None:
+        raise ConfigError("validation.observe.ros2 is required")
+    observation = observe_ros2(config.validation.ros2_observer)
+    _write_or_print(observation.to_dict(), args.output)
+    return 0
 
 
 def _observation_from_file(path: Path) -> SystemObservation:

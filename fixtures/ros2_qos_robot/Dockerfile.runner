@@ -10,6 +10,7 @@ RUN apt-get update \
         python3-pip \
         ros-humble-diagnostic-msgs \
         ros-humble-std-srvs \
+        ros-humble-tf2-ros \
     && rm -rf /var/lib/apt/lists/*
 
 COPY . /opt/fraeno
