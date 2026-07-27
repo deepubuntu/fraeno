@@ -4,13 +4,13 @@ import time
 
 import rclpy
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
-from example_interfaces.action import Fibonacci
 from geometry_msgs.msg import TransformStamped
 from rclpy.action import ActionServer
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Float64
 from std_srvs.srv import Trigger
+from tf2_msgs.action import LookupTransform
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 
 
@@ -35,7 +35,7 @@ class Controller(Node):
         self.create_service(Trigger, "/robot/health", self._health)
         self._move_action = ActionServer(
             self,
-            Fibonacci,
+            LookupTransform,
             "/robot/move",
             self._move,
         )
@@ -85,11 +85,9 @@ class Controller(Node):
     async def _move(
         self,
         goal_handle: ActionServer,
-    ) -> Fibonacci.Result:
+    ) -> LookupTransform.Result:
         goal_handle.succeed()
-        result = Fibonacci.Result()
-        result.sequence = [0, 1]
-        return result
+        return LookupTransform.Result()
 
 
 def main() -> None:
