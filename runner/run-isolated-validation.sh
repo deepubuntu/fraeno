@@ -68,6 +68,7 @@ capture_workspace() {
   containers+=("$container")
   docker start --attach "$container"
   docker cp "$container:/evidence/run.json" "$evidence"
+  chmod 0444 "$evidence"
   docker rm --volumes "$container" >/dev/null
 }
 
