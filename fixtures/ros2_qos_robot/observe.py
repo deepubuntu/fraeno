@@ -14,6 +14,8 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Float64
 
+from fraeno.validation.rate_window import MessageRateWindow
+
 
 def fully_qualified(name: str, namespace: str) -> str:
     if namespace == "/":
@@ -55,8 +57,8 @@ class Probe(Node):
         super().__init__("fraeno_observer")
         best_effort = QoSProfile(depth=100)
         best_effort.reliability = ReliabilityPolicy.BEST_EFFORT
-        self.sensor_messages = 0
-        self.command_messages = 0
+        self.sensor_rate = MessageRateWindow()
+        self.command_rate = MessageRateWindow()
         self.diagnostics: dict[str, int] = {}
         self.create_subscription(
             Float64,
@@ -79,11 +81,11 @@ class Probe(Node):
 
     def _on_sensor(self, message: Float64) -> None:
         del message
-        self.sensor_messages += 1
+        self.sensor_rate.record()
 
     def _on_command(self, message: Float64) -> None:
         del message
-        self.command_messages += 1
+        self.command_rate.record()
 
     def _on_diagnostics(self, message: DiagnosticArray) -> None:
         for status in message.status:
@@ -104,6 +106,10 @@ class Probe(Node):
             )
         )
         return nodes, topics, services
+
+    def begin_rate_measurement(self) -> None:
+        self.sensor_rate.begin()
+        self.command_rate.begin()
 
     def graph(self, duration: float) -> dict[str, Any]:
         nodes = sorted(
@@ -129,14 +135,14 @@ class Probe(Node):
                         if value.node_name != "fraeno_observer"
                     ],
                     "rate_hz": (
-                        self.sensor_messages / duration
+                        self.sensor_rate.rate_hz(duration)
                         if name == "/sensor/reading"
-                        else self.command_messages / duration
+                        else self.command_rate.rate_hz(duration)
                     ),
                     "message_count": (
-                        self.sensor_messages
+                        self.sensor_rate.count
                         if name == "/sensor/reading"
-                        else self.command_messages
+                        else self.command_rate.count
                     ),
                 }
             )
@@ -199,6 +205,7 @@ def main() -> int:
                 break
 
         started = time.monotonic()
+        probe.begin_rate_measurement()
         while time.monotonic() - started < 5:
             rclpy.spin_once(probe, timeout_sec=0.1)
         duration = time.monotonic() - started
@@ -206,8 +213,8 @@ def main() -> int:
         healthy = (
             processes_alive
             and graph_stable
-            and probe.sensor_messages >= 75
-            and probe.command_messages >= 35
+            and probe.sensor_rate.count >= 75
+            and probe.command_rate.count >= 35
             and probe.diagnostics.get("controller", 2) == 0
         )
         result = {
