@@ -8,6 +8,17 @@ class SettingsError(ValueError):
     pass
 
 
+def _positive_integer(name: str, default: int) -> int:
+    raw_value = os.environ.get(name, str(default)).strip()
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise SettingsError(f"{name} must be a positive integer") from error
+    if value <= 0:
+        raise SettingsError(f"{name} must be a positive integer")
+    return value
+
+
 @dataclass(frozen=True)
 class AppSettings:
     app_id: str
@@ -16,6 +27,14 @@ class AppSettings:
     github_api_url: str = "https://api.github.com"
     github_api_version: str = "2026-03-10"
     check_name: str = "Fraeno / robot integration"
+    max_delivery_attempts: int = 5
+    delivery_stale_seconds: int = 900
+    run_stale_seconds: int = 900
+    max_run_seconds: int = 7200
+    delivery_retention_days: int = 14
+    run_retention_days: int = 30
+    repository_retention_days: int = 30
+    replay_audit_retention_days: int = 90
 
     @classmethod
     def from_environment(cls) -> AppSettings:
@@ -42,6 +61,28 @@ class AppSettings:
             github_api_url=os.environ.get(
                 "FRAENO_GITHUB_API_URL", "https://api.github.com"
             ).rstrip("/"),
+            max_delivery_attempts=_positive_integer(
+                "FRAENO_MAX_DELIVERY_ATTEMPTS", 5
+            ),
+            delivery_stale_seconds=_positive_integer(
+                "FRAENO_DELIVERY_STALE_SECONDS", 900
+            ),
+            run_stale_seconds=_positive_integer(
+                "FRAENO_RUN_STALE_SECONDS", 900
+            ),
+            max_run_seconds=_positive_integer("FRAENO_MAX_RUN_SECONDS", 7200),
+            delivery_retention_days=_positive_integer(
+                "FRAENO_DELIVERY_RETENTION_DAYS", 14
+            ),
+            run_retention_days=_positive_integer(
+                "FRAENO_RUN_RETENTION_DAYS", 30
+            ),
+            repository_retention_days=_positive_integer(
+                "FRAENO_REPOSITORY_RETENTION_DAYS", 30
+            ),
+            replay_audit_retention_days=_positive_integer(
+                "FRAENO_REPLAY_AUDIT_RETENTION_DAYS", 90
+            ),
         )
 
 

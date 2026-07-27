@@ -1,0 +1,24 @@
+{
+  "displayName": "Fraeno rejected GitHub signature",
+  "documentation": {
+    "content": "Fraeno rejected a GitHub webhook signature. Check webhook secret consistency before redelivering anything.",
+    "mimeType": "text/markdown"
+  },
+  "conditions": [
+    {
+      "displayName": "A signature was rejected",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" AND jsonPayload.fraeno_metric=\"signature_rejection\""
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": false,
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "1800s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": []
+}
