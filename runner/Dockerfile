@@ -21,7 +21,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONPATH=/opt/fraeno/runtime \
     PYTHONUNBUFFERED=1
 
-RUN groupadd --gid 65532 fraeno-sandbox \
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends python3-pip \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 65532 fraeno-sandbox \
     && useradd \
         --uid 65532 \
         --gid 65532 \

@@ -16,6 +16,8 @@ if [[ "$entrypoint" != "/ros_entrypoint.sh python3 -m fraeno.cli" ]]; then
 fi
 docker run --rm --entrypoint /ros_entrypoint.sh "$image_id" \
   python3 -c 'import rclpy'
+docker run --rm --entrypoint /ros_entrypoint.sh "$image_id" \
+  python3 -m pip --version
 
 repository_fixture="$PWD/tests/fixtures/external_ros2_repository"
 hostile_fixture="$PWD/tests/fixtures/hostile_candidate"
