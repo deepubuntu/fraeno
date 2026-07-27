@@ -1,13 +1,68 @@
 from __future__ import annotations
 
+import json
 import re
+import subprocess
+import sys
+import textwrap
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).parents[1]
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "publish-runner.yml"
 CONTROL_RELEASE_WORKFLOW = (
     ROOT / ".github" / "workflows" / "release-control-plane.yml"
 )
+CONTROL_IMAGE = (
+    "us-central1-docker.pkg.dev/deepubuntu-32f9e/"
+    "fraeno-control-plane/control-plane"
+)
+CONTROL_COMMIT = "a" * 40
+CONTROL_DIGEST = "sha256:" + ("b" * 64)
+SECOND_CONTROL_DIGEST = "sha256:" + ("c" * 64)
+
+
+def _registry_tag_resolver_source() -> str:
+    workflow = CONTROL_RELEASE_WORKFLOW.read_text()
+    block = workflow.split("# REGISTRY_TAG_RESOLVER_START", maxsplit=1)[1].split(
+        "# REGISTRY_TAG_RESOLVER_END",
+        maxsplit=1,
+    )[0]
+    source = block.split("<<'PY'\n", maxsplit=1)[1].rsplit(
+        "\n          PY",
+        maxsplit=1,
+    )[0]
+    return textwrap.dedent(source)
+
+
+def _run_registry_tag_resolver(
+    tmp_path: Path,
+    inventory: object,
+) -> tuple[subprocess.CompletedProcess[str], str, str]:
+    inventory_path = tmp_path / "inventory.json"
+    semantic_path = tmp_path / "semantic.txt"
+    commit_path = tmp_path / "commit.txt"
+    inventory_path.write_text(json.dumps(inventory))
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            CONTROL_IMAGE,
+            "v0.2.0",
+            CONTROL_COMMIT,
+            str(inventory_path),
+            str(semantic_path),
+            str(commit_path),
+        ],
+        input=_registry_tag_resolver_source(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    semantic = semantic_path.read_text().strip() if semantic_path.exists() else ""
+    commit = commit_path.read_text().strip() if commit_path.exists() else ""
+    return result, semantic, commit
 
 
 def test_release_workflow_is_manual_and_minimally_privileged() -> None:
@@ -221,6 +276,126 @@ def test_control_release_requires_same_commit_runner_evidence() -> None:
     assert "resume-control-plane-evidence" in workflow
     assert "sha256sum --check fraeno-control-plane-release.json.sha256" in workflow
     assert "Existing tag does not match proven resume evidence." in workflow
+
+
+def test_control_release_lists_tags_without_parsing_error_messages() -> None:
+    workflow = CONTROL_RELEASE_WORKFLOW.read_text()
+
+    assert "gcloud artifacts docker images list" in workflow
+    assert "--include-tags" in workflow
+    assert "--format json > control-plane-images.json" in workflow
+    assert "describe_optional_digest" not in workflow
+    assert 'grep --quiet "NOT_FOUND"' not in workflow
+    assert "semantic_digest=\"$(<semantic-tag-digest.txt)\"" in workflow
+    assert "commit_digest=\"$(<commit-tag-digest.txt)\"" in workflow
+    finalize = workflow[workflow.index("Finalize immutable release tags") :]
+    assert "refresh_tag_digests" in finalize
+    assert finalize.count("refresh_tag_digests") == 3
+    assert "images describe" not in finalize
+    assert "|| true" not in finalize
+    assert finalize.index(
+        'require_tag_available "$RELEASE_SHA" "$commit_digest"'
+    ) < finalize.index(
+        'add_tag_if_absent "$RELEASE_SHA" "$commit_digest"'
+    )
+    assert finalize.index(
+        'require_tag_available "v$RELEASE_VERSION" "$semantic_digest"'
+    ) < finalize.index(
+        'add_tag_if_absent "v$RELEASE_VERSION" "$semantic_digest"'
+    )
+    assert finalize.index(
+        'require_tag_available "v$RELEASE_VERSION" "$semantic_digest"'
+    ) < finalize.index(
+        'add_tag_if_absent "$RELEASE_SHA" "$commit_digest"'
+    )
+
+
+def test_registry_tag_resolver_treats_an_empty_inventory_as_a_new_release(
+    tmp_path: Path,
+) -> None:
+    result, semantic, commit = _run_registry_tag_resolver(tmp_path, [])
+
+    assert result.returncode == 0, result.stderr
+    assert semantic == ""
+    assert commit == ""
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        ["v0.2.0", CONTROL_COMMIT],
+        f"v0.2.0,{CONTROL_COMMIT}",
+    ],
+)
+def test_registry_tag_resolver_returns_exact_structured_digests(
+    tmp_path: Path,
+    tags: list[str] | str,
+) -> None:
+    inventory = [
+        {
+            "package": "us-central1-docker.pkg.dev/other/repository/image",
+            "tags": ["v0.2.0", CONTROL_COMMIT],
+            "version": SECOND_CONTROL_DIGEST,
+        },
+        {
+            "package": CONTROL_IMAGE,
+            "tags": tags,
+            "version": CONTROL_DIGEST,
+        },
+    ]
+
+    result, semantic, commit = _run_registry_tag_resolver(tmp_path, inventory)
+
+    assert result.returncode == 0, result.stderr
+    assert semantic == CONTROL_DIGEST
+    assert commit == CONTROL_DIGEST
+
+
+@pytest.mark.parametrize(
+    ("inventory", "message"),
+    [
+        ({}, "inventory must be a JSON list"),
+        ([None], "inventory contains a non-object"),
+        (
+            [{"package": CONTROL_IMAGE, "tags": 17, "version": CONTROL_DIGEST}],
+            "returned invalid tag data",
+        ),
+        (
+            [
+                {
+                    "package": CONTROL_IMAGE,
+                    "tags": ["v0.2.0"],
+                    "version": "not-a-digest",
+                }
+            ],
+            "returned an invalid digest",
+        ),
+        (
+            [
+                {
+                    "package": CONTROL_IMAGE,
+                    "tags": ["v0.2.0"],
+                    "version": CONTROL_DIGEST,
+                },
+                {
+                    "package": CONTROL_IMAGE,
+                    "tags": ["v0.2.0"],
+                    "version": SECOND_CONTROL_DIGEST,
+                },
+            ],
+            "returned more than one digest",
+        ),
+    ],
+)
+def test_registry_tag_resolver_fails_closed_on_invalid_inventory(
+    tmp_path: Path,
+    inventory: object,
+    message: str,
+) -> None:
+    result, _, _ = _run_registry_tag_resolver(tmp_path, inventory)
+
+    assert result.returncode != 0
+    assert message in result.stderr
 
 
 def test_control_release_proves_rollback_and_restores_candidate() -> None:
