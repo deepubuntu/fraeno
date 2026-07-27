@@ -76,7 +76,7 @@ class WebhookSettings:
         if missing:
             raise SettingsError(f"missing required settings: {', '.join(missing)}")
         return cls(
-            webhook_secret=values["FRAENO_GITHUB_WEBHOOK_SECRET"],
+            webhook_secret=values["FRAENO_GITHUB_WEBHOOK_SECRET"].strip(),
             gcp_project=values["FRAENO_GCP_PROJECT"].strip(),
             gcp_location=values["FRAENO_GCP_LOCATION"].strip(),
             queue_name=values["FRAENO_TASK_QUEUE"].strip(),

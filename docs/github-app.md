@@ -25,6 +25,18 @@ Subscribe to:
 
 Checks write permission also delivers rerun events for checks created by Fraeno.
 
+Generate the webhook secret without a file-ending newline, then verify its exact
+length before storing the same value in GitHub and Secret Manager:
+
+```bash
+openssl rand -hex 32 | tr -d '\n' > webhook-secret
+test "$(wc -c < webhook-secret)" -eq 64
+```
+
+Fraeno also strips surrounding file whitespace when it loads the secret. This
+prevents a trailing newline from causing every valid GitHub delivery to fail
+signature verification.
+
 ## Production services
 
 Fraeno deploys one container as two Cloud Run services.
