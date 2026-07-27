@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fraeno | Robot dependency updates with system-level testing</title>
+    <meta
+      name="description"
+      content="Fraeno automatically manages and updates robot software dependencies, and tests the complete robotic system before changes are deployed."
+    />
+    <link rel="canonical" href="https://fraeno.com/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#08110f" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Fraeno" />
+    <meta
+      property="og:description"
+      content="Robot dependency updates with complete-system integration testing."
+    />
+    <meta property="og:url" content="https://fraeno.com/" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Fraeno home">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <span>Fraeno</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#how-it-works">How it works</a>
+        <a href="#proof">Proof</a>
+        <a href="#scope">Current scope</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> Private pilot for ROS 2</p>
+          <h1>Fraeno updates the software inside robots, then tests that they still work.</h1>
+          <p class="lede">
+            Fraeno automatically manages and updates robot software dependencies, and tests the
+            complete robotic system before changes are deployed.
+          </p>
+          <p class="plain-language">
+            <em>essentially, dependabot for robots + integration testing.</em>
+          </p>
+          <div class="actions">
+            <a class="button button-primary" href="#proof">See a blocked regression</a>
+            <a
+              class="button button-secondary"
+              href="https://github.com/apps/fraeno-robotics"
+              rel="noreferrer"
+            >
+              GitHub App
+            </a>
+          </div>
+        </div>
+
+        <div class="system-card" aria-label="Example Fraeno validation report">
+          <div class="window-bar">
+            <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <p>Fraeno / robot integration</p>
+            <span class="live-status">live test</span>
+          </div>
+          <div class="report">
+            <div class="report-row">
+              <span>Update</span>
+              <strong>robot fixture 1.0.1 → 2.0.0</strong>
+            </div>
+            <div class="report-row">
+              <span>Build</span>
+              <strong class="pass">passed</strong>
+            </div>
+            <div class="report-row">
+              <span>ROS graph</span>
+              <strong class="pass">observed</strong>
+            </div>
+            <div class="report-row">
+              <span>QoS contract</span>
+              <strong class="fail">incompatible</strong>
+            </div>
+            <div class="report-row">
+              <span>/robot/command</span>
+              <strong class="fail">20.6 Hz → 0 Hz</strong>
+            </div>
+            <div class="decision">
+              <span>Fraeno decision</span>
+              <strong>BLOCK DEPLOYMENT</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="problem-strip" aria-label="The problem Fraeno solves">
+        <p>
+          A robot can <strong>compile successfully</strong> while a driver, QoS change, container,
+          or system package silently breaks its behavior.
+        </p>
+      </section>
+
+      <section class="section" id="how-it-works">
+        <div class="section-heading">
+          <p class="kicker">One update. One controlled experiment.</p>
+          <h2>Test the robot system, not only the package.</h2>
+        </div>
+        <div class="steps">
+          <article>
+            <span class="step-number">01</span>
+            <h3>Discover</h3>
+            <p>
+              Map dependencies across ROS, Python, CMake, Docker, APT, vcstool, and git
+              submodules.
+            </p>
+          </article>
+          <article>
+            <span class="step-number">02</span>
+            <h3>Update</h3>
+            <p>
+              Change one supported dependency declaration and keep the test contract anchored to
+              the trusted base commit.
+            </p>
+          </article>
+          <article>
+            <span class="step-number">03</span>
+            <h3>Run both systems</h3>
+            <p>
+              Build and launch clean baseline and candidate environments inside the repository's
+              own GitHub Actions runner.
+            </p>
+          </article>
+          <article>
+            <span class="step-number">04</span>
+            <h3>Pass or block</h3>
+            <p>
+              Compare nodes, topics, services, QoS, rates, transforms, and diagnostics before the
+              change can merge.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section proof-section" id="proof">
+        <div class="proof-copy">
+          <p class="kicker">The failure ordinary dependency bots miss</p>
+          <h2>The build passed. The robot stopped communicating.</h2>
+          <p>
+            In Fraeno's live ROS 2 fixture, the candidate still builds after an update. But its
+            sensor publisher changes to best effort while the controller still requires reliable
+            delivery. The controller receives nothing, the command topic falls silent, and
+            diagnostics worsen.
+          </p>
+          <p>Fraeno observes the running graph and blocks the change.</p>
+        </div>
+        <div class="signal-comparison" aria-label="Baseline and candidate behavior comparison">
+          <div class="signal-column">
+            <p class="signal-label">Baseline</p>
+            <h3>Healthy</h3>
+            <dl>
+              <div><dt>Build</dt><dd>Passed</dd></div>
+              <div><dt>QoS path</dt><dd>Compatible</dd></div>
+              <div><dt>Command rate</dt><dd>20.6 Hz</dd></div>
+              <div><dt>Diagnostics</dt><dd>OK</dd></div>
+            </dl>
+          </div>
+          <div class="comparison-arrow" aria-hidden="true">→</div>
+          <div class="signal-column candidate">
+            <p class="signal-label">Candidate</p>
+            <h3>Blocked</h3>
+            <dl>
+              <div><dt>Build</dt><dd>Passed</dd></div>
+              <div><dt>QoS path</dt><dd>Broken</dd></div>
+              <div><dt>Command rate</dt><dd>0 Hz</dd></div>
+              <div><dt>Diagnostics</dt><dd>Error</dd></div>
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      <section class="section scope-section" id="scope">
+        <div class="section-heading">
+          <p class="kicker">Narrow first release</p>
+          <h2>A real production target, with honest boundaries.</h2>
+        </div>
+        <div class="scope-grid">
+          <article>
+            <p class="scope-label">First supported target</p>
+            <h3>ROS 2 Humble</h3>
+            <p>Ubuntu 22.04, amd64, using a Docker-based GitHub Actions runner.</p>
+          </article>
+          <article>
+            <p class="scope-label">Current validation</p>
+            <h3>L2 live behavior</h3>
+            <p>Runtime graph, interfaces, QoS, message rates, transforms, and diagnostics.</p>
+          </article>
+          <article>
+            <p class="scope-label">Security boundary</p>
+            <h3>Your runner, your code</h3>
+            <p>
+              Customer source runs in the repository's isolated runner. Fraeno's hosted service
+              coordinates checks without cloning the code.
+            </p>
+          </article>
+        </div>
+        <p class="scope-note">
+          A passing result means the configured target and declared probes passed. It does not
+          claim that every possible robot behavior is safe.
+        </p>
+      </section>
+
+      <section class="closing">
+        <p class="kicker">Robot updates deserve robot tests.</p>
+        <h2>Stop discovering dependency failures after deployment.</h2>
+        <a class="button button-primary" href="https://github.com/apps/fraeno-robotics">
+          View the Fraeno GitHub App
+        </a>
+      </section>
+    </main>
+
+    <footer>
+      <div class="brand footer-brand">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <span>Fraeno</span>
+      </div>
+      <p>A DeepUbuntu product.</p>
+      <p>© 2026 Fraeno.</p>
+    </footer>
+  </body>
+</html>
