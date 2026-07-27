@@ -1,37 +1,30 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
 from packaging.requirements import Requirement
-from packaging.version import InvalidVersion, Version
 
+from fraeno.dependency_graph import TargetPlatform
 from fraeno.models import Dependency, Ecosystem, ScanReport
+from fraeno.update_discovery import (
+    DEFAULT_PROVIDERS,
+    PythonUpdateProvider,
+    RegistryUpdateCatalog,
+    UpdateCandidate,
+    UpdateCatalog,
+    UpdateDiscoveryProvider,
+    UpdateDiscoveryReport,
+    discover_updates,
+)
 
 
 class UpdateError(ValueError):
     pass
-
-
-@dataclass(frozen=True)
-class UpdateCandidate:
-    ecosystem: Ecosystem
-    name: str
-    current: str
-    target: str
-    source_files: tuple[str, ...]
-
-    @property
-    def identity(self) -> str:
-        return f"{self.ecosystem.value}:{self.name}"
-
-    def to_dict(self) -> dict[str, Any]:
-        value = asdict(self)
-        value["ecosystem"] = self.ecosystem.value
-        return value
 
 
 @dataclass(frozen=True)
@@ -50,52 +43,20 @@ def find_python_updates(
     report: ScanReport,
     client: httpx.Client | None = None,
 ) -> tuple[list[UpdateCandidate], list[str]]:
-    own_client = client is None
-    active_client = client or httpx.Client(timeout=10)
-    candidates: list[UpdateCandidate] = []
-    warnings: list[str] = []
+    catalog = RegistryUpdateCatalog(client)
     try:
-        grouped: dict[str, list[Dependency]] = {}
-        for dependency in report.dependencies:
-            if (
-                dependency.ecosystem is Ecosystem.PYTHON
-                and dependency.resolved is not None
-            ):
-                grouped.setdefault(dependency.name.lower(), []).append(dependency)
-        for dependencies in grouped.values():
-            dependency = dependencies[0]
-            try:
-                response = active_client.get(
-                    f"https://pypi.org/pypi/{dependency.name}/json"
-                )
-                response.raise_for_status()
-                data = response.json()
-                target = str(data["info"]["version"])
-                current = dependency.resolved or ""
-                if _newer_stable(current, target):
-                    candidates.append(
-                        UpdateCandidate(
-                            ecosystem=Ecosystem.PYTHON,
-                            name=dependency.name,
-                            current=current,
-                            target=target,
-                            source_files=tuple(
-                                sorted({item.source.path for item in dependencies})
-                            ),
-                        )
-                    )
-            except (
-                httpx.HTTPError,
-                KeyError,
-                TypeError,
-                ValueError,
-            ) as error:
-                warnings.append(f"python:{dependency.name}: {error}")
+        discovery = discover_updates(
+            report,
+            catalog=catalog,
+            providers=(PythonUpdateProvider(),),
+        )
     finally:
-        if own_client:
-            active_client.close()
-    candidates.sort(key=lambda item: item.name.lower())
-    return candidates, warnings
+        catalog.close()
+    warnings = list(discovery.warnings)
+    warnings.extend(
+        f"{item.identity}: {item.reason}" for item in discovery.refusals
+    )
+    return list(discovery.candidates), warnings
 
 
 def apply_update(
@@ -181,6 +142,45 @@ def apply_next_python_update(
             dry_run=dry_run,
         ),
         warnings,
+    )
+
+
+def apply_next_update(
+    root: Path,
+    report: ScanReport,
+    *,
+    target: TargetPlatform | None = None,
+    catalog: UpdateCatalog | None = None,
+    providers: Sequence[UpdateDiscoveryProvider] = DEFAULT_PROVIDERS,
+    dry_run: bool = False,
+) -> tuple[UpdateResult | None, UpdateDiscoveryReport]:
+    discovery = discover_updates(
+        report,
+        target=target,
+        catalog=catalog,
+        providers=providers,
+    )
+    managed = {
+        Ecosystem.PYTHON,
+        Ecosystem.DOCKER,
+        Ecosystem.APT,
+        Ecosystem.GIT,
+    }
+    candidate = next(
+        (item for item in discovery.candidates if item.ecosystem in managed),
+        None,
+    )
+    if candidate is None:
+        return None, discovery
+    return (
+        apply_update(
+            root,
+            report,
+            candidate.identity,
+            candidate.target,
+            dry_run=dry_run,
+        ),
+        discovery,
     )
 
 
@@ -296,12 +296,3 @@ def _rewrite_repos(
             lines[index] = f"{prefix}version: {target}{newline}"
             return "".join(lines)
     raise UpdateError("repository version field could not be located")
-
-
-def _newer_stable(current: str, target: str) -> bool:
-    try:
-        current_version = Version(current)
-        target_version = Version(target)
-    except InvalidVersion:
-        return False
-    return not target_version.is_prerelease and target_version > current_version

@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>fraeno_update_fixture</name>
+  <version>0.1.0</version>
+  <description>Deterministic update discovery fixture</description>
+  <maintainer email="fixture@example.com">Fraeno fixture</maintainer>
+  <license>Apache-2.0</license>
+  <depend>rclcpp</depend>
+</package>

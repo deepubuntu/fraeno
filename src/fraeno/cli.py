@@ -18,10 +18,10 @@ from fraeno.lockfile import (
 )
 from fraeno.models import ScanReport
 from fraeno.scanner import RepositoryScanner
+from fraeno.update_discovery import FixtureUpdateCatalog, discover_updates
 from fraeno.updates import (
-    apply_next_python_update,
+    apply_next_update,
     apply_update,
-    find_python_updates,
 )
 from fraeno.validation.compare import Outcome, compare_systems
 from fraeno.validation.contract import CapturedWorkspace, assemble_validation
@@ -62,6 +62,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     outdated.add_argument("repository", nargs="?", default=".")
     outdated.add_argument("--output", "-o", type=Path)
+    outdated.add_argument("--catalog", type=Path)
+    _add_target_options(outdated)
 
     update = commands.add_parser(
         "update", help="Apply one supported dependency update."
@@ -79,6 +81,8 @@ def build_parser() -> argparse.ArgumentParser:
     update_next.add_argument("repository", nargs="?", default=".")
     update_next.add_argument("--dry-run", action="store_true")
     update_next.add_argument("--output", "-o", type=Path)
+    update_next.add_argument("--catalog", type=Path)
+    _add_target_options(update_next)
 
     compare = commands.add_parser(
         "compare", help="Compare two robot-system observation snapshots."
@@ -187,15 +191,15 @@ def _compare_locks(args: argparse.Namespace) -> int:
 def _outdated(args: argparse.Namespace) -> int:
     root = Path(args.repository).resolve()
     report = RepositoryScanner(root).scan()
-    candidates, warnings = find_python_updates(report)
-    _write_or_print(
-        {
-            "schema_version": 1,
-            "updates": [candidate.to_dict() for candidate in candidates],
-            "warnings": report.warnings + warnings,
-        },
-        args.output,
+    catalog = FixtureUpdateCatalog.from_path(args.catalog) if args.catalog else None
+    discovery = discover_updates(
+        report,
+        target=_target_from_args(args, report),
+        catalog=catalog,
     )
+    payload = discovery.to_dict()
+    payload["warnings"] = report.warnings + list(discovery.warnings)
+    _write_or_print(payload, args.output)
     return 0
 
 
@@ -216,15 +220,22 @@ def _update(args: argparse.Namespace) -> int:
 def _update_next(args: argparse.Namespace) -> int:
     root = Path(args.repository).resolve()
     report = RepositoryScanner(root).scan()
-    result, warnings = apply_next_python_update(
-        root, report, dry_run=args.dry_run
+    catalog = FixtureUpdateCatalog.from_path(args.catalog) if args.catalog else None
+    result, discovery = apply_next_update(
+        root,
+        report,
+        target=_target_from_args(args, report),
+        catalog=catalog,
+        dry_run=args.dry_run,
     )
     _write_or_print(
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "updated": result is not None,
             "update": result.to_dict() if result else None,
-            "warnings": report.warnings + warnings,
+            "candidates": [item.to_dict() for item in discovery.candidates],
+            "refusals": [item.to_dict() for item in discovery.refusals],
+            "warnings": report.warnings + list(discovery.warnings),
         },
         args.output,
     )

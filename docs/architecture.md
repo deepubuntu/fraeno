@@ -59,13 +59,27 @@ Managed in v1:
 
 Observed but unmanaged in v1:
 
-- ROS logical keys and version conditions;
+- ROS logical keys and version conditions, including rosdep update evidence;
 - dynamic CMake;
 - unpinned APT packages;
 - git submodule gitlinks;
 - host-coupled drivers and hardware.
 
 Unsupported declarations remain visible in reports. Fraeno never silently treats omitted evidence as safe.
+
+### Update providers
+
+Update discovery is separate from manifest rewriting. Python, Docker, APT,
+vcstool, and rosdep providers all consume the same catalog interface. A
+candidate is valid only when the repository has one current value, the catalog
+returns one target, and the provider can prove the target is newer or
+immutable. Every candidate keeps its release date, registry source, and
+provenance.
+
+The production catalog reads public package and source registries. Tests use a
+committed catalog fixture, so the suite has no registry or internet dependency.
+The fixture represents ROS 2 Humble on Ubuntu 22.04 and exercises all five
+providers through the public command line.
 
 ### Resolved dependency graph
 
