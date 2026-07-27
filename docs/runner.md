@@ -5,25 +5,32 @@ copying Fraeno source or its internal fixtures.
 
 ## Files in the customer repository
 
-Copy these release-matched templates:
+Run `fraeno init` to write these release-matched files:
 
 ```text
 templates/github/fraeno-validation.yml
   to .github/workflows/fraeno-validation.yml
 
+templates/github/fraeno-updates.yml
+  to .github/workflows/fraeno-updates.yml
+
 templates/github/run-isolated-validation.sh
   to .github/fraeno/run-isolated-validation.sh
 ```
 
-Add `.fraeno.yml` at the repository root. Set the repository variable
-`FRAENO_RUNNER_IMAGE` to the published runner reference with its immutable
-digest:
+The command also adds `.fraeno.yml` at the repository root. With `--open-pr`,
+it proposes the files through a draft pull request and sets the repository
+variable `FRAENO_RUNNER_IMAGE` to the published runner reference with its
+immutable digest:
 
 ```text
 REGISTRY/IMAGE@sha256:FULL_DIGEST
 ```
 
 The workflow rejects mutable tags.
+
+See [the onboarding guide](onboarding.md) for the exact command, local checks,
+GitHub App installation, and first test pull request.
 
 Fraeno's own runner publisher also uses immutable Artifact Registry tags and
 records the final digest, SBOM, provenance, and previous production digest.

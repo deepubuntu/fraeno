@@ -34,6 +34,19 @@ Install the local engine:
 python3 -m pip install .
 ```
 
+Add Fraeno to a ROS 2 repository:
+
+```bash
+fraeno init . \
+  --launch-command "ros2 launch my_robot_bringup system.launch.py" \
+  --runner-image "REGISTRY/runner@sha256:FULL_DIGEST" \
+  --open-pr
+```
+
+After the onboarding pull request is merged, `fraeno doctor` names any missing
+local command, GitHub file, runner setting, App permission, or App event. See
+[the onboarding guide](docs/onboarding.md) for the complete first test.
+
 Scan and lock a repository:
 
 ```bash
@@ -125,11 +138,11 @@ block the candidate.
 
 ## External repository runner
 
-An external repository needs only a project contract and the thin files under
-`templates/github/`. It does not copy Fraeno source or internal fixtures. The
-workflow requires a runner image pinned by digest, runs baseline and candidate
-code in separate containers, then creates the final report in a third trusted
-container.
+An external repository needs only a project contract and the thin trusted files
+written by `fraeno init`. It does not copy Fraeno source or internal fixtures.
+The workflow requires a runner image pinned by digest, runs baseline and
+candidate code in separate containers, then creates the final report in a third
+trusted container.
 
 Every report identifies the exact Fraeno engine version. See
 `docs/runner.md` for the runner contract and local proof.

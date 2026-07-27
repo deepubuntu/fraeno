@@ -31,6 +31,12 @@ jobs:
         run: docker build --file runner/Dockerfile --tag fraeno-runner:test .
       - name: Test external repository and hostile candidate
         run: bash tests/container/test-external-runner.sh fraeno-runner:test
+      - name: Test docs-only onboarding repository
+        run: bash tests/container/test-onboarding.sh fraeno-runner:test
+      - name: Keep Git credentials outside the update container
+        run: >-
+          bash tests/container/test-update-workflow-sandbox.sh
+          fraeno-runner:test
 
   ros-integration:
     runs-on: ubuntu-22.04

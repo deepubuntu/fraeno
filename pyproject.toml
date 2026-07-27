@@ -42,6 +42,9 @@ fraeno-github-ops = "fraeno.github_app.operations:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/fraeno"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"templates/github" = "fraeno/templates/github"
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]

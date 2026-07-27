@@ -6,6 +6,7 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 WORKDIR /build
 COPY pyproject.toml README.md ./
 COPY src ./src
+COPY templates ./templates
 RUN python -m pip wheel --wheel-dir /wheels ".[app]"
 
 FROM python:3.12-slim
