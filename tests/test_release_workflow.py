@@ -5,6 +5,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "publish-runner.yml"
+CONTROL_RELEASE_WORKFLOW = (
+    ROOT / ".github" / "workflows" / "release-control-plane.yml"
+)
 
 
 def test_release_workflow_is_manual_and_minimally_privileged() -> None:
@@ -120,10 +123,7 @@ def test_release_workflow_publishes_only_create_once_tags_and_digest_evidence() 
 
 def test_every_runner_related_action_is_pinned_to_a_commit() -> None:
     workflow_paths = [
-        ROOT / ".github" / "workflows" / "ci.yml",
-        ROOT / ".github" / "workflows" / "fraeno-updates.yml",
-        ROOT / ".github" / "workflows" / "fraeno-validation.yml",
-        RELEASE_WORKFLOW,
+        *sorted((ROOT / ".github" / "workflows").glob("*.yml")),
         *sorted((ROOT / "templates" / "github").glob("*.yml")),
     ]
     references: list[tuple[Path, str]] = []
@@ -140,8 +140,120 @@ def test_every_runner_related_action_is_pinned_to_a_commit() -> None:
         )
 
 
+def test_action_comments_match_the_pinned_releases() -> None:
+    expected_versions = {
+        "3d3c42e5aac5ba805825da76410c181273ba90b1": "v7.0.1",
+        "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a": "v7.0.1",
+        "ece7cb06caefa5fff74198d8649806c4678c61a1": "v6",
+        "7c6bc770dae815cd3e89ee6cdf493a5fab2cc093": "v3",
+        "aa5489c8933f4cc7a4f7d45035b3b1440c9c10db": "v3",
+        "bb05f3f5519dd87d3ba754cc423b652a5edd6d2c": "v4.2.0",
+    }
+    workflow_paths = [
+        *sorted((ROOT / ".github" / "workflows").glob("*.yml")),
+        *sorted((ROOT / "templates" / "github").glob("*.yml")),
+    ]
+    for path in workflow_paths:
+        for line in path.read_text().splitlines():
+            match = re.search(r"\buses:\s*\S+@([0-9a-f]{40})\s+#\s+(\S+)", line)
+            if match:
+                sha, version = match.groups()
+                assert expected_versions.get(sha) == version, (
+                    f"{path} labels {sha} as {version}"
+                )
+
+
 def test_runner_image_records_the_release_commit() -> None:
     dockerfile = (ROOT / "runner" / "Dockerfile").read_text()
 
     assert "ARG FRAENO_REVISION=unknown" in dockerfile
     assert 'org.opencontainers.image.revision="${FRAENO_REVISION}"' in dockerfile
+
+
+def test_control_release_is_manual_keyless_and_exactly_scoped() -> None:
+    workflow = CONTROL_RELEASE_WORKFLOW.read_text()
+
+    assert "workflow_dispatch:" in workflow
+    triggers = workflow[: workflow.index("permissions:")]
+    assert re.search(r"^\s{2}(push|release):", triggers, re.MULTILINE) is None
+    assert "environment: control-plane-production" in workflow
+    assert "credentials_json" not in workflow
+    assert "EXPECTED_GCP_REPOSITORY: fraeno-control-plane" in workflow
+    assert "fraeno-control-plane-releaser@" in workflow
+    assert "fraeno-github/providers/fraeno-control-plane" in workflow
+    assert "WEBHOOK_SERVICE: fraeno-github-webhook" in workflow
+    assert "WORKER_SERVICE: fraeno-github-worker" in workflow
+    assert workflow.index("Require every release check") < workflow.index(
+        "Authenticate to Google Cloud"
+    )
+
+
+def test_control_release_requires_same_commit_runner_evidence() -> None:
+    workflow = CONTROL_RELEASE_WORKFLOW.read_text()
+
+    assert "publish-runner.yml/runs" in workflow
+    assert 'run.get("head_sha") == commit' in workflow
+    assert 'run.get("display_title") == title' in workflow
+    assert "sha256sum --check fraeno-runner-release.json.sha256" in workflow
+    assert '"$RUNNER_IMAGE:v$RELEASE_VERSION"' in workflow
+    assert '"$RUNNER_IMAGE:$RELEASE_SHA"' in workflow
+    assert "runner_semantic_digest" in workflow
+    assert "RUNNER_EVIDENCE_DIGEST" in workflow
+    assert "resume_run_id:" in workflow
+    assert "resume-control-plane-evidence" in workflow
+    assert "sha256sum --check fraeno-control-plane-release.json.sha256" in workflow
+    assert "Existing tag does not match proven resume evidence." in workflow
+
+
+def test_control_release_proves_rollback_and_restores_candidate() -> None:
+    workflow = CONTROL_RELEASE_WORKFLOW.read_text()
+
+    candidate = 'set_traffic "$WORKER_SERVICE" "$worker_candidate_revision"'
+    rollback = 'set_traffic "$WORKER_SERVICE" "$PREVIOUS_WORKER_REVISION"'
+    assert workflow.count(candidate) == 2
+    assert workflow.count(rollback) == 2
+    traffic_changes = workflow[workflow.index('deploy_candidate "$WEBHOOK_SERVICE"') :]
+    first_candidate = traffic_changes.index(candidate)
+    rollback_position = traffic_changes.index(rollback)
+    restored_candidate = traffic_changes.index(candidate, first_candidate + 1)
+    assert first_candidate < rollback_position < restored_candidate
+    assert "trap restore_previous_on_failure EXIT" in workflow
+    assert "--remove-tags \"$traffic_tag\"" in workflow
+    assert "--revision \"$webhook_candidate_revision\"" in workflow
+    assert "--revision \"$worker_candidate_revision\"" in workflow
+    assert 'revisions describe "$PREVIOUS_WEBHOOK_REVISION"' in workflow
+    assert 'revisions describe "$PREVIOUS_WORKER_REVISION"' in workflow
+    assert "--revision-input previous-webhook-revision.json" in workflow
+    assert "--revision-input final-webhook-revision.json" in workflow
+    assert "candidate_restored\": True" in workflow
+    assert "retention-days: 90" in workflow
+
+
+def test_github_release_can_run_only_after_production_evidence() -> None:
+    workflow = CONTROL_RELEASE_WORKFLOW.read_text()
+
+    publish_job = workflow.index("publish-github-release:")
+    artifact_step = workflow.index("Preserve deployment and rollback evidence")
+    tag_step = workflow.index("Finalize immutable release tags")
+    cleanup_step = workflow.index(
+        "Restore previous production after a failed release"
+    )
+    assert artifact_step < publish_job
+    assert artifact_step < tag_step < cleanup_step < publish_job
+    assert "failure() &&" in workflow
+    assert "steps.gcp-auth.outcome == 'success' &&" in workflow
+    assert "steps.deploy.outcome != 'skipped'" in workflow
+    assert (
+        '--to-revisions "$PREVIOUS_WEBHOOK_REVISION=100"'
+        in workflow[cleanup_step:publish_job]
+    )
+    assert (
+        '--to-revisions "$PREVIOUS_WORKER_REVISION=100"'
+        in workflow[cleanup_step:publish_job]
+    )
+    assert "needs: release" in workflow[publish_job:]
+    assert "contents: write" in workflow[publish_job:]
+    assert "id-token: write" not in workflow[publish_job:]
+    assert 'gh release create "v$RELEASE_VERSION"' in workflow[publish_job:]
+    assert '--target "$RELEASE_SHA"' in workflow[publish_job:]
+    assert "verify_release_tag" in workflow[publish_job:]

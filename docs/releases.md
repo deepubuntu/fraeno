@@ -120,9 +120,126 @@ REGISTRY/runner@sha256:PREVIOUS_DIGEST
 Rollback means restoring that digest in the customer repository variable
 `FRAENO_RUNNER_IMAGE`. A semantic or commit tag is never used for rollback.
 
-## Current boundary
+## Control-plane releases
 
-This workflow publishes only the customer validation runner. It does not deploy
-the Fraeno control plane to Cloud Run. A separate release gate must still make
-both control-plane services use an image built from the exact release commit
-and prove revision rollback before issue 19 can close.
+The `Release Fraeno control plane` workflow deploys the GitHub App webhook and
+worker from one image built from the exact reviewed commit. It uses the private,
+immutable repository:
+
+```text
+us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-control-plane
+```
+
+Create the `control-plane-production` GitHub environment with the same five
+variable names used by the runner environment. Use these values:
+
+```text
+GCP_PROJECT_ID=deepubuntu-32f9e
+GCP_ARTIFACT_REGISTRY_LOCATION=us-central1
+GCP_ARTIFACT_REGISTRY_REPOSITORY=fraeno-control-plane
+GCP_WORKLOAD_IDENTITY_PROVIDER=projects/286435890377/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-control-plane
+GCP_RELEASE_SERVICE_ACCOUNT=fraeno-control-plane-releaser@deepubuntu-32f9e.iam.gserviceaccount.com
+```
+
+The dedicated provider accepts only tokens for `deepubuntu/fraeno`, repository
+ID `1313414423`, owner ID `224500479`, `refs/heads/main`, the workflow named
+`Release Fraeno control plane`, and the `workflow_dispatch` event. The release
+service account has no key and cannot read application secrets. Its permissions
+are limited to:
+
+- write images to `fraeno-control-plane`;
+- update and inspect the two existing Cloud Run services;
+- act as the existing webhook and worker runtime service accounts;
+- invoke the private worker for health checks;
+- mint an identity token for those checks.
+
+The service-scoped custom role is declared in
+`deploy/gcp/control-plane-release-role.yaml`. The release service account has
+that role only on the webhook and worker. A second custom role in
+`deploy/gcp/control-plane-operation-role.yaml` grants project-level read access
+only to the asynchronous operation records needed by the command line client.
+The workflow also pins the two allowed service names and both expected runtime
+service accounts.
+
+Run the workflow with:
+
+- `version`, the exact SemVer in `pyproject.toml`;
+- `commit_sha`, the full reviewed merge commit on `main`;
+- `previous_webhook_revision`, the only revision currently receiving webhook
+  traffic;
+- `previous_worker_revision`, the only revision currently receiving worker
+  traffic.
+
+The explicit previous revisions are a concurrency guard. The workflow stops if
+production changed after the operator inspected it.
+
+The gate tests the checked-out commit and requires successful `test`,
+`container`, and `ros-integration` checks on that commit. It also requires the
+successful `Fraeno / robot integration` result on the reviewed pull request
+tree and proves that tree is identical to the merge commit.
+
+Before it builds or deploys the control plane, the gate requires both
+`runner:vVERSION` and `runner:FULL_COMMIT_SHA` in the immutable runner
+repository. Both tags must resolve to the same digest. This means the runner,
+control plane, and final GitHub Release always identify the same version and
+exact commit. Publish the runner from the final commit before starting the
+control-plane release.
+
+BuildKit publishes a uniquely tagged release candidate with an SPDX SBOM and
+SLSA provenance. Both Cloud Run services are deployed from its digest with no
+traffic first. Their tagged revision URLs must pass health checks, and the
+public webhook must reject an invalid GitHub signature.
+
+After both candidates pass, the workflow:
+
+1. sends production traffic to both candidate revisions and tests them;
+2. sends traffic back to both explicitly supplied previous revisions and tests
+   them;
+3. restores both candidate revisions to 100 percent traffic and tests them
+   again;
+4. uploads a checksummed manifest with the previous and final revisions;
+5. creates immutable semantic and commit tags for the tested digest;
+6. creates the GitHub Release and product version tag at the exact commit.
+
+Evidence uploads before semantic tags are created. Any later failure in the
+Google-authenticated job runs a separate cleanup step that restores both
+previous revisions and removes temporary Cloud Run traffic tags. A successful
+run keeps only the final candidate revisions at 100 percent traffic, but retains
+the unique registry candidate tag as build evidence.
+
+If immutable tag creation partially succeeds, start the same version and commit
+again with `resume_run_id` set to the failed run. The recovery path accepts an
+existing tag only after it verifies the prior run identity, downloads its
+evidence, verifies the checksum, confirms the exact version and commit, confirms
+rollback was proven, and matches the existing registry digest. It then repeats
+the deployment and rollback proof before idempotently completing both tags.
+Never use `resume_run_id` to reuse unrelated build output.
+
+The GitHub Release runs as a separate job with only `contents: write`. It cannot
+request a Google identity or change production. It starts only after the
+deployment evidence artifact has uploaded successfully, and its notes link to
+that workflow run, the exact runner digest, and the exact control-plane digest.
+If release publication is interrupted after GitHub created it, rerunning failed
+jobs verifies that the existing tag points to the exact release commit and
+finishes successfully.
+
+The cleanup policy in `deploy/gcp/control-plane-cleanup-policy.json` runs in
+dry-run mode. It always keeps semantic release tags and the ten most recent
+versions. Only untagged content older than 30 days is eligible for deletion.
+Artifact Registry does not delete tagged artifacts while immutable tags are
+enabled. Successful candidate tags share layers with their semantic release,
+and failed candidate tags are intentionally retained as evidence. If measured
+failed-build storage becomes material, use a separate mutable staging
+repository rather than weakening the release repository. Review the dry-run
+audit before ever enabling deletion:
+
+```bash
+gcloud artifacts repositories set-cleanup-policies fraeno-control-plane \
+  --project deepubuntu-32f9e \
+  --location us-central1 \
+  --policy deploy/gcp/control-plane-cleanup-policy.json \
+  --dry-run
+```
+
+Issue 19 can close only after the runner and control-plane release workflows
+both complete successfully and their evidence artifacts are verified.
