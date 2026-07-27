@@ -1,0 +1,34 @@
+version: 1
+
+project:
+  name: external-ros2-robot
+
+validation:
+  steps:
+    - name: run candidate probe and build ROS 2 workspace
+      command:
+        - bash
+        - -lc
+        - >-
+          if [[ -f hostile.py ]]; then python3 hostile.py; fi &&
+          colcon build --event-handlers console_direct+
+      timeout_seconds: 300
+  observe:
+    command:
+      - bash
+      - -lc
+      - python3 "$FRAENO_TRUSTED_ROOT/observe.py"
+    timeout_seconds: 30
+  contract:
+    required_nodes:
+      - /external_sensor
+      - /external_controller
+    required_topics:
+      - /external/sensor
+      - /external/command
+    required_services:
+      - /external/health
+    minimum_topic_rates_hz:
+      /external/sensor: 10
+      /external/command: 5
+    maximum_topic_rate_regression_percent: 25

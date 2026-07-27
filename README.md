@@ -82,6 +82,17 @@ fraeno validate \
 
 The contract must come from the trusted base commit. A candidate cannot weaken its own required checks.
 
+## External repository runner
+
+An external repository needs only a project contract and the thin files under
+`templates/github/`. It does not copy Fraeno source or internal fixtures. The
+workflow requires a runner image pinned by digest, runs baseline and candidate
+code in separate containers, then creates the final report in a third trusted
+container.
+
+Every report identifies the exact Fraeno engine version. See
+`docs/runner.md` for the runner contract and local proof.
+
 ## Safe and breaking proof
 
 The committed ROS 2 Humble fixture runs a live sensor publisher and reliable

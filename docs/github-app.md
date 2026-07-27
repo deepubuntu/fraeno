@@ -92,3 +92,17 @@ Before customer installation:
 6. verify a safe update passes;
 7. verify the QoS-breaking update fails;
 8. require `Fraeno / robot integration` on `main`.
+
+## Repository runner contract
+
+Copy the files in `templates/github/` into the same paths in the customer
+repository. Set the repository variable `FRAENO_RUNNER_IMAGE` to a published
+Fraeno runner image including its full `@sha256:` digest. A tag alone is
+rejected.
+
+The project contract must live at `.fraeno.yml` on the base branch. Observation
+commands that use repository code should call the trusted copy through
+`FRAENO_TRUSTED_ROOT`. The candidate can read this copy but cannot change it.
+
+The complete isolation model and local verification command are in
+`docs/runner.md`.

@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>external_robot</name>
+  <version>1.0.0</version>
+  <description>Independent ROS 2 repository used to verify the Fraeno runner contract.</description>
+  <maintainer email="robot@example.com">Robot Maintainer</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_python</buildtool_depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

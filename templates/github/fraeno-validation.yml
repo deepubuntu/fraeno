@@ -44,7 +44,16 @@ jobs:
   validate:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
+    env:
+      FRAENO_RUNNER_IMAGE: ${{ vars.FRAENO_RUNNER_IMAGE }}
     steps:
+      - name: Require an immutable Fraeno runner
+        run: |
+          if [[ "$FRAENO_RUNNER_IMAGE" != *@sha256:* ]]; then
+            echo "Set FRAENO_RUNNER_IMAGE to a Fraeno runner pinned by digest." >&2
+            exit 2
+          fi
+
       - name: Check out trusted baseline
         uses: actions/checkout@v4
         with:
@@ -61,20 +70,9 @@ jobs:
           path: candidate
           persist-credentials: false
 
-      - name: Build trusted Fraeno runner
-        run: |
-          docker build \
-            --file baseline/runner/Dockerfile \
-            --tag fraeno-runner:${{ inputs.check_run_id }} \
-            baseline
-          image_id="$(docker image inspect \
-            --format '{{.Id}}' \
-            fraeno-runner:${{ inputs.check_run_id }})"
-          echo "FRAENO_RUNNER_IMAGE=$image_id" >> "$GITHUB_ENV"
-
-      - name: Validate in separate sandboxes
+      - name: Run isolated validation
         run: >-
-          bash baseline/runner/run-isolated-validation.sh
+          bash baseline/.github/fraeno/run-isolated-validation.sh
           "$FRAENO_RUNNER_IMAGE"
           "$PWD/baseline"
           "$PWD/candidate"
