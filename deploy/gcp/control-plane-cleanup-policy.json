@@ -1,0 +1,46 @@
+[
+  {
+    "name": "delete-old-failed-candidates",
+    "action": {
+      "type": "Delete"
+    },
+    "condition": {
+      "tagState": "tagged",
+      "tagPrefixes": [
+        "candidate-"
+      ],
+      "olderThan": "7776000s"
+    }
+  },
+  {
+    "name": "delete-old-untagged-content",
+    "action": {
+      "type": "Delete"
+    },
+    "condition": {
+      "tagState": "untagged",
+      "olderThan": "2592000s"
+    }
+  },
+  {
+    "name": "keep-semantic-releases",
+    "action": {
+      "type": "Keep"
+    },
+    "condition": {
+      "tagState": "tagged",
+      "tagPrefixes": [
+        "v"
+      ]
+    }
+  },
+  {
+    "name": "keep-recent-builds",
+    "action": {
+      "type": "Keep"
+    },
+    "mostRecentVersions": {
+      "keepCount": 10
+    }
+  }
+]
