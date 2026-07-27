@@ -28,10 +28,23 @@ def test_release_workflow_uses_wif_and_direct_artifact_registry() -> None:
     assert "service_account:" in workflow
     assert "credentials_json" not in workflow
     assert "GCP_ARTIFACT_REGISTRY_REPOSITORY" in workflow
+    assert "EXPECTED_GCP_PROJECT_ID: deepubuntu-32f9e" in workflow
+    assert "EXPECTED_GCP_LOCATION: us-central1" in workflow
+    assert "EXPECTED_GCP_REPOSITORY: fraeno-runner" in workflow
+    assert 'GCP_REPOSITORY" != "$EXPECTED_GCP_REPOSITORY' in workflow
     assert "-docker.pkg.dev" in workflow
     assert "supabase" not in workflow.lower()
     assert "render" not in workflow.lower()
     assert "vercel" not in workflow.lower()
+
+
+def test_release_docs_name_only_the_public_runner_repository() -> None:
+    release_docs = (ROOT / "docs" / "releases.md").read_text()
+
+    assert "us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-runner" in release_docs
+    assert "`us-central1`, and `fraeno-runner`" in release_docs
+    assert "update fraeno-runner" in release_docs
+    assert "private mixed `fraeno`" in release_docs
 
 
 def test_release_workflow_tests_and_gates_before_publish() -> None:

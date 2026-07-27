@@ -41,6 +41,9 @@ jobs:
       GCP_REPOSITORY: ${{ vars.GCP_ARTIFACT_REGISTRY_REPOSITORY }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_RELEASE_SERVICE_ACCOUNT: ${{ vars.GCP_RELEASE_SERVICE_ACCOUNT }}
+      EXPECTED_GCP_PROJECT_ID: deepubuntu-32f9e
+      EXPECTED_GCP_LOCATION: us-central1
+      EXPECTED_GCP_REPOSITORY: fraeno-runner
       PYTHONPATH: src
     steps:
       - name: Check out the exact reviewed commit
@@ -153,10 +156,22 @@ jobs:
             GCP_RELEASE_SERVICE_ACCOUNT
           do
             if [[ -z "${!name}" ]]; then
-              echo "Missing repository variable $name" >&2
+              echo "Missing runner-production environment variable $name" >&2
               exit 2
             fi
           done
+          if [[ "$GCP_PROJECT_ID" != "$EXPECTED_GCP_PROJECT_ID" ]]; then
+            echo "Runner releases must use project $EXPECTED_GCP_PROJECT_ID." >&2
+            exit 2
+          fi
+          if [[ "$GCP_LOCATION" != "$EXPECTED_GCP_LOCATION" ]]; then
+            echo "Runner releases must use location $EXPECTED_GCP_LOCATION." >&2
+            exit 2
+          fi
+          if [[ "$GCP_REPOSITORY" != "$EXPECTED_GCP_REPOSITORY" ]]; then
+            echo "Runner releases must use public repository $EXPECTED_GCP_REPOSITORY." >&2
+            exit 2
+          fi
 
       - name: Authenticate to Google Cloud with workload identity
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3

@@ -4,15 +4,17 @@ Fraeno publishes its validation runner directly to Google Artifact Registry.
 The target repository is:
 
 ```text
-us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno
+us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-runner
 ```
 
 The release workflow is manual until production identity and review gates are
-configured. It never accepts a service-account key.
+configured. It never accepts a service-account key. It also refuses any project,
+region, or repository other than this public runner-only target.
 
 ## Production prerequisites
 
-Create these GitHub repository variables:
+Create the `runner-production` GitHub environment, then create these variables
+inside that environment:
 
 ```text
 GCP_PROJECT_ID
@@ -23,19 +25,21 @@ GCP_RELEASE_SERVICE_ACCOUNT
 ```
 
 For the current GCP target, the first three values are `deepubuntu-32f9e`,
-`us-central1`, and `fraeno`.
+`us-central1`, and `fraeno-runner`.
 
 The workload identity provider must trust only this repository and the
 `runner-production` GitHub environment. Its service account needs Artifact
-Registry writer access only on the `fraeno` repository. It does not need
+Registry writer access only on the `fraeno-runner` repository. It does not need
 project editor, Cloud Run admin, service-account key creation, or Secret
 Manager access.
 
 Configure required reviewers on the `runner-production` GitHub environment.
-Then enable immutable tags on the existing repository:
+The repository must remain publicly readable through
+`roles/artifactregistry.reader` for `allUsers`. Enable immutable tags on the
+existing repository:
 
 ```bash
-gcloud artifacts repositories update fraeno \
+gcloud artifacts repositories update fraeno-runner \
   --project deepubuntu-32f9e \
   --location us-central1 \
   --immutable-tags
@@ -43,6 +47,10 @@ gcloud artifacts repositories update fraeno \
 
 That GCP change is intentionally not made by the workflow. A publisher must not
 be able to weaken the repository that protects its own releases.
+
+The private mixed `fraeno` Artifact Registry repository is not a runner release
+target. The workflow checks the exact project, region, and repository before it
+requests Google credentials.
 
 ## Release inputs
 
