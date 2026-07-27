@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
 
-from fraeno.github_app.auth import verify_webhook_signature
+from fraeno.github_app.auth import verify_rotating_webhook_signature
 from fraeno.github_app.client import GitHubClient
 from fraeno.github_app.handler import EventHandler
 from fraeno.github_app.metrics import JsonLogMetricSink, MetricSink
@@ -104,6 +104,30 @@ def create_webhook_app(
             "configured": app.state.enqueuer is not None,
         }
 
+    @app.post(
+        "/credential-readiness/webhook",
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
+    async def webhook_credential_readiness(request: Request) -> Response:
+        active_settings = resolved_settings
+        if active_settings is None:
+            raise HTTPException(status_code=503, detail="Webhook is not configured")
+        if request_too_large(request):
+            raise HTTPException(status_code=413, detail="Webhook payload is too large")
+        body = await request.body()
+        if len(body) > MAX_REQUEST_BYTES:
+            raise HTTPException(status_code=413, detail="Webhook payload is too large")
+        matched_secret = verify_rotating_webhook_signature(
+            body,
+            request.headers.get("x-hub-signature-256"),
+            active_secret=active_settings.webhook_secret,
+            previous_secret=active_settings.previous_webhook_secret,
+            rotation=active_settings.credential_rotation,
+        )
+        if matched_secret is None:
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
     @app.post("/webhooks/github", status_code=status.HTTP_202_ACCEPTED)
     async def github_webhook(request: Request) -> Response:
         active_settings = resolved_settings
@@ -115,13 +139,18 @@ def create_webhook_app(
         body = await request.body()
         if len(body) > MAX_REQUEST_BYTES:
             raise HTTPException(status_code=413, detail="Webhook payload is too large")
-        if not verify_webhook_signature(
+        matched_secret = verify_rotating_webhook_signature(
             body,
             request.headers.get("x-hub-signature-256"),
-            active_settings.webhook_secret,
-        ):
+            active_secret=active_settings.webhook_secret,
+            previous_secret=active_settings.previous_webhook_secret,
+            rotation=active_settings.credential_rotation,
+        )
+        if matched_secret is None:
             active_metrics.emit("signature_rejection")
             raise HTTPException(status_code=401, detail="Invalid webhook signature")
+        if matched_secret == "previous":
+            active_metrics.emit("previous_webhook_secret_accepted")
 
         event = request.headers.get("x-github-event", "")
         delivery_id = request.headers.get("x-github-delivery", "")
@@ -271,6 +300,17 @@ def create_worker_app(
                 status_code=403, detail="Cloud Scheduler request required"
             )
         return (await active_reconciler.reconcile()).to_dict()
+
+    @app.post("/internal/credential-readiness")
+    async def credential_readiness(request: Request) -> dict[str, Any]:
+        active_handler: EventHandler | None = app.state.handler
+        if active_handler is None:
+            raise HTTPException(status_code=503, detail="Worker is not configured")
+        if request.headers.get("x-fraeno-credential-check") != "true":
+            raise HTTPException(
+                status_code=403, detail="Credential verification request required"
+            )
+        return await active_handler.client.credential_readiness()
 
     return app
 

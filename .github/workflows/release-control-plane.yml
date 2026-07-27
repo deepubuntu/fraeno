@@ -503,6 +503,16 @@ jobs:
             --revision "$PREVIOUS_WORKER_REVISION" \
             --service-account "$WORKER_RUNTIME_SERVICE_ACCOUNT" \
             --output previous-worker.json
+          python -m fraeno.credential_rotation validate-release-source \
+            --service previous-webhook-service.json \
+            --active-revision previous-webhook-revision.json \
+            --role webhook \
+            --output webhook-release-credential-source.json
+          python -m fraeno.credential_rotation validate-release-source \
+            --service previous-worker-service.json \
+            --active-revision previous-worker-revision.json \
+            --role worker \
+            --output worker-release-credential-source.json
           python - <<'PY'
           import json
 

@@ -1,13 +1,19 @@
 import hashlib
 import hmac
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 from fraeno.github_app.app import create_webhook_app, create_worker_app
-from fraeno.github_app.settings import AppSettings, WebhookSettings
+from fraeno.github_app.settings import (
+    AppSettings,
+    CredentialRotationWindow,
+    SettingsError,
+    WebhookSettings,
+)
 from fraeno.github_app.store import MemoryEventStore
 
 
@@ -136,6 +142,40 @@ def test_webhook_secret_ignores_file_ending_newline(
     assert "newline-delivery" in enqueuer.events
 
 
+def test_rotation_environment_requires_a_bounded_complete_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FRAENO_GITHUB_WEBHOOK_SECRET", "active-secret")
+    monkeypatch.setenv(
+        "FRAENO_GITHUB_WEBHOOK_SECRET_PREVIOUS", "previous-secret"
+    )
+    monkeypatch.setenv(
+        "FRAENO_CREDENTIAL_ROTATION_STARTED_AT", "2026-07-27T20:00:00Z"
+    )
+    monkeypatch.setenv(
+        "FRAENO_PREVIOUS_CREDENTIALS_VALID_UNTIL", "2026-07-27T21:00:00Z"
+    )
+    monkeypatch.setenv("FRAENO_GCP_PROJECT", "project")
+    monkeypatch.setenv("FRAENO_GCP_LOCATION", "us-central1")
+    monkeypatch.setenv("FRAENO_TASK_QUEUE", "queue")
+    monkeypatch.setenv("FRAENO_WORKER_URL", "https://worker.example")
+    monkeypatch.setenv(
+        "FRAENO_TASK_SERVICE_ACCOUNT",
+        "tasks@project.iam.gserviceaccount.com",
+    )
+
+    settings = WebhookSettings.from_environment()
+
+    assert settings.previous_webhook_secret == "previous-secret"
+    assert settings.credential_rotation is not None
+
+    monkeypatch.setenv(
+        "FRAENO_PREVIOUS_CREDENTIALS_VALID_UNTIL", "2026-07-27T21:00:01Z"
+    )
+    with pytest.raises(SettingsError, match="cannot exceed one hour"):
+        WebhookSettings.from_environment()
+
+
 def test_invalid_webhook_signature_is_rejected() -> None:
     settings = webhook_settings()
     app = create_webhook_app(settings, RecordingEnqueuer())
@@ -153,6 +193,121 @@ def test_invalid_webhook_signature_is_rejected() -> None:
         )
 
     assert response.status_code == 401
+
+
+def test_previous_webhook_secret_is_accepted_only_during_rotation() -> None:
+    now = datetime.now(timezone.utc)
+    monkeypatch_settings = WebhookSettings(
+        webhook_secret="active-secret",
+        gcp_project="project",
+        gcp_location="us-central1",
+        queue_name="queue",
+        worker_url="https://worker.example",
+        task_service_account="tasks@project.iam.gserviceaccount.com",
+        previous_webhook_secret="previous-secret",
+        credential_rotation=CredentialRotationWindow(
+            started_at=now - timedelta(minutes=1),
+            previous_valid_until=now + timedelta(minutes=1),
+        ),
+    )
+    app = create_webhook_app(monkeypatch_settings, RecordingEnqueuer())
+    body = b'{"action":"opened"}'
+
+    with TestClient(app) as client:
+        accepted = client.post(
+            "/webhooks/github",
+            content=body,
+            headers=signed_headers(
+                body, "previous-secret", "previous-secret-delivery"
+            ),
+        )
+
+    assert accepted.status_code == 202
+
+
+def test_expired_previous_webhook_secret_is_rejected() -> None:
+    now = datetime.now(timezone.utc)
+    settings = WebhookSettings(
+        webhook_secret="active-secret",
+        gcp_project="project",
+        gcp_location="us-central1",
+        queue_name="queue",
+        worker_url="https://worker.example",
+        task_service_account="tasks@project.iam.gserviceaccount.com",
+        previous_webhook_secret="previous-secret",
+        credential_rotation=CredentialRotationWindow(
+            started_at=now - timedelta(minutes=2),
+            previous_valid_until=now - timedelta(minutes=1),
+        ),
+    )
+    app = create_webhook_app(settings, RecordingEnqueuer())
+    body = b'{"action":"opened"}'
+
+    with TestClient(app) as client:
+        rejected = client.post(
+            "/webhooks/github",
+            content=body,
+            headers=signed_headers(
+                body, "previous-secret", "expired-secret-delivery"
+            ),
+        )
+
+    assert rejected.status_code == 401
+
+
+def test_credential_readiness_verifies_both_secrets_without_enqueueing() -> None:
+    now = datetime.now(timezone.utc)
+    settings = WebhookSettings(
+        webhook_secret="active-secret",
+        gcp_project="project",
+        gcp_location="us-central1",
+        queue_name="queue",
+        worker_url="https://worker.example",
+        task_service_account="tasks@project.iam.gserviceaccount.com",
+        previous_webhook_secret="previous-secret",
+        credential_rotation=CredentialRotationWindow(
+            started_at=now - timedelta(minutes=1),
+            previous_valid_until=now + timedelta(minutes=1),
+        ),
+    )
+    enqueuer = RecordingEnqueuer()
+    app = create_webhook_app(settings, enqueuer)
+    body = b'{"probe":"credential-readiness"}'
+
+    with TestClient(app) as client:
+        active = client.post(
+            "/credential-readiness/webhook",
+            content=body,
+            headers=signed_headers(body, "active-secret", "unused-active"),
+        )
+        previous = client.post(
+            "/credential-readiness/webhook",
+            content=body,
+            headers=signed_headers(body, "previous-secret", "unused-previous"),
+        )
+        invalid = client.post(
+            "/credential-readiness/webhook",
+            content=body,
+            headers=signed_headers(body, "invalid-secret", "unused-invalid"),
+        )
+
+    assert active.status_code == 204
+    assert previous.status_code == 204
+    assert invalid.status_code == 401
+    assert enqueuer.events == {}
+
+
+def test_credential_readiness_enforces_request_size_limit() -> None:
+    app = create_webhook_app(webhook_settings(), RecordingEnqueuer())
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/credential-readiness/webhook",
+            content=b"{}",
+            headers={"content-length": str(1_000_001)},
+        )
+
+    assert response.status_code == 413
 
 
 def test_worker_processes_and_deduplicates_a_delivery() -> None:
