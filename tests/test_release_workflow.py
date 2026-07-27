@@ -17,6 +17,7 @@ def test_release_workflow_is_manual_and_minimally_privileged() -> None:
     assert "checks: read" in workflow
     assert "contents: read" in workflow
     assert "id-token: write" in workflow
+    assert "pull-requests: read" in workflow
     assert "contents: write" not in workflow
 
 
