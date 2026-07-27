@@ -1,0 +1,5 @@
+repositories:
+  camera_driver:
+    type: git
+    url: https://github.com/example/camera_driver.git
+    version: 0123456789abcdef0123456789abcdef01234567

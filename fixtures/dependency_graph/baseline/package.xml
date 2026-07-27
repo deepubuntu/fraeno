@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>fraeno_graph_fixture</name>
+  <version>0.1.0</version>
+  <description>Fraeno dependency graph fixture</description>
+  <maintainer email="robot@example.com">Robot</maintainer>
+  <license>MIT</license>
+  <depend>rclcpp</depend>
+  <depend>cv_bridge</depend>
+</package>

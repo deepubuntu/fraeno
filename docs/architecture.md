@@ -59,6 +59,37 @@ Observed but unmanaged in v1:
 
 Unsupported declarations remain visible in reports. Fraeno never silently treats omitted evidence as safe.
 
+### Resolved dependency graph
+
+Fraeno lock schema 2 preserves four separate ideas:
+
+- a manifest is a scanned source file with a content hash;
+- a declaration is one dependency entry at one source path;
+- an artifact is a concrete version, tag, digest, or revision supported by evidence;
+- a component links declarations that refer to the same underlying library.
+
+Declarations are never collapsed. Two Docker stages that install the same APT
+package remain two declarations and link to one component. Known aliases such
+as `OpenCV`, `opencv-python`, and `libopencv-dev` also link to one component.
+Names without a trusted alias remain scoped to their ecosystem.
+
+Each declaration records the ROS distribution, operating system, operating
+system version, architecture, and container stage. Inferred target fields use
+the literal value `unknown` when evidence is missing or contradictory.
+
+Resolution has three states:
+
+- `resolved` means the graph has an immutable reference or provider evidence;
+- `declared` means a manifest has an exact version or mutable tag but no
+  registry artifact evidence;
+- `unknown` means the declaration does not identify one artifact.
+
+Resolution providers can add registry provenance, release dates, package
+identities, and component links without changing the public graph or lock
+shape. Lock comparison groups changed declarations by component so one update
+across Python, CMake, APT, Docker, ROS, or source manifests has one complete
+explanation.
+
 ## Result semantics
 
 - `pass`: candidate behavior satisfies the trusted contract and permitted baseline deltas.
