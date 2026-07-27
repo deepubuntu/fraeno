@@ -2,5 +2,6 @@ title: Fraeno control plane releaser
 description: Deploy and roll back the two existing Fraeno Cloud Run services
 stage: GA
 includedPermissions:
+  - run.revisions.get
   - run.services.get
   - run.services.update

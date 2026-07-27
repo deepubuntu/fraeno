@@ -199,6 +199,10 @@ def test_control_release_requires_same_commit_runner_evidence() -> None:
     assert '"$RUNNER_IMAGE:$RELEASE_SHA"' in workflow
     assert "runner_semantic_digest" in workflow
     assert "RUNNER_EVIDENCE_DIGEST" in workflow
+    assert "resume_run_id:" in workflow
+    assert "resume-control-plane-evidence" in workflow
+    assert "sha256sum --check fraeno-control-plane-release.json.sha256" in workflow
+    assert "Existing tag does not match proven resume evidence." in workflow
 
 
 def test_control_release_proves_rollback_and_restores_candidate() -> None:
@@ -217,6 +221,10 @@ def test_control_release_proves_rollback_and_restores_candidate() -> None:
     assert "--remove-tags \"$traffic_tag\"" in workflow
     assert "--revision \"$webhook_candidate_revision\"" in workflow
     assert "--revision \"$worker_candidate_revision\"" in workflow
+    assert 'revisions describe "$PREVIOUS_WEBHOOK_REVISION"' in workflow
+    assert 'revisions describe "$PREVIOUS_WORKER_REVISION"' in workflow
+    assert "--revision-input previous-webhook-revision.json" in workflow
+    assert "--revision-input final-webhook-revision.json" in workflow
     assert "candidate_restored\": True" in workflow
     assert "retention-days: 90" in workflow
 
@@ -226,9 +234,24 @@ def test_github_release_can_run_only_after_production_evidence() -> None:
 
     publish_job = workflow.index("publish-github-release:")
     artifact_step = workflow.index("Preserve deployment and rollback evidence")
+    tag_step = workflow.index("Finalize immutable release tags")
+    cleanup_step = workflow.index(
+        "Restore previous production after a failed release"
+    )
     assert artifact_step < publish_job
+    assert artifact_step < tag_step < cleanup_step < publish_job
+    assert "if: failure() && steps.gcp-auth.outcome == 'success'" in workflow
+    assert (
+        '--to-revisions "$PREVIOUS_WEBHOOK_REVISION=100"'
+        in workflow[cleanup_step:publish_job]
+    )
+    assert (
+        '--to-revisions "$PREVIOUS_WORKER_REVISION=100"'
+        in workflow[cleanup_step:publish_job]
+    )
     assert "needs: release" in workflow[publish_job:]
     assert "contents: write" in workflow[publish_job:]
     assert "id-token: write" not in workflow[publish_job:]
     assert 'gh release create "v$RELEASE_VERSION"' in workflow[publish_job:]
     assert '--target "$RELEASE_SHA"' in workflow[publish_job:]
+    assert "verify_release_tag" in workflow[publish_job:]

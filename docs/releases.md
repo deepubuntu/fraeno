@@ -197,18 +197,31 @@ After both candidates pass, the workflow:
    them;
 3. restores both candidate revisions to 100 percent traffic and tests them
    again;
-4. creates immutable semantic and commit tags for the tested digest;
-5. uploads a checksummed manifest with the previous and final revisions;
+4. uploads a checksummed manifest with the previous and final revisions;
+5. creates immutable semantic and commit tags for the tested digest;
 6. creates the GitHub Release and product version tag at the exact commit.
 
-Any failure before the release completes restores both previous revisions. A
-successful run removes the temporary Cloud Run traffic tags, but retains the
-unique registry candidate tag as build evidence.
+Evidence uploads before semantic tags are created. Any later failure in the
+Google-authenticated job runs a separate cleanup step that restores both
+previous revisions and removes temporary Cloud Run traffic tags. A successful
+run keeps only the final candidate revisions at 100 percent traffic, but retains
+the unique registry candidate tag as build evidence.
+
+If immutable tag creation partially succeeds, start the same version and commit
+again with `resume_run_id` set to the failed run. The recovery path accepts an
+existing tag only after it verifies the prior run identity, downloads its
+evidence, verifies the checksum, confirms the exact version and commit, confirms
+rollback was proven, and matches the existing registry digest. It then repeats
+the deployment and rollback proof before idempotently completing both tags.
+Never use `resume_run_id` to reuse unrelated build output.
 
 The GitHub Release runs as a separate job with only `contents: write`. It cannot
 request a Google identity or change production. It starts only after the
 deployment evidence artifact has uploaded successfully, and its notes link to
 that workflow run, the exact runner digest, and the exact control-plane digest.
+If release publication is interrupted after GitHub created it, rerunning failed
+jobs verifies that the existing tag points to the exact release commit and
+finishes successfully.
 
 The cleanup policy in `deploy/gcp/control-plane-cleanup-policy.json` runs in
 dry-run mode. It always keeps semantic release tags and the ten most recent

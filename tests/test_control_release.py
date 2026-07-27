@@ -21,21 +21,11 @@ def service_payload(
     *,
     name: str = "fraeno-github-webhook",
     revision: str = "fraeno-github-webhook-00008-abc",
-    image: str = f"old.example/control-plane@{OLD_DIGEST}",
-    service_account: str = WEBHOOK_ACCOUNT,
 ) -> dict[str, object]:
     return {
         "metadata": {"name": name},
-        "spec": {
-            "template": {
-                "spec": {
-                    "containers": [{"image": image}],
-                    "serviceAccountName": service_account,
-                }
-            }
-        },
         "status": {
-            "latestReadyRevisionName": revision,
+            "latestReadyRevisionName": "fraeno-github-webhook-00009-failed",
             "url": f"https://{name}.example.test",
             "traffic": [
                 {"revisionName": revision, "percent": 100},
@@ -45,6 +35,29 @@ def service_payload(
                     "tag": "old-candidate",
                 },
             ],
+        },
+    }
+
+
+def revision_payload(
+    *,
+    name: str = "fraeno-github-webhook-00008-abc",
+    service: str = "fraeno-github-webhook",
+    image: str = f"old.example/control-plane@{OLD_DIGEST}",
+    service_account: str = WEBHOOK_ACCOUNT,
+) -> dict[str, object]:
+    return {
+        "metadata": {
+            "name": name,
+            "labels": {"serving.knative.dev/service": service},
+        },
+        "spec": {
+            "containers": [{"image": image}],
+            "serviceAccountName": service_account,
+        },
+        "status": {
+            "conditions": [{"type": "Ready", "status": "True"}],
+            "imageDigest": image,
         },
     }
 
@@ -68,6 +81,7 @@ def test_validate_control_release_inputs_require_exact_values() -> None:
 def test_inspect_service_requires_one_digest_pinned_active_revision() -> None:
     snapshot = inspect_service(
         service_payload(),
+        revision_payload(),
         expected_service="fraeno-github-webhook",
         expected_revision="fraeno-github-webhook-00008-abc",
         expected_service_account=WEBHOOK_ACCOUNT,
@@ -92,15 +106,26 @@ def test_inspect_service_requires_one_digest_pinned_active_revision() -> None:
     with pytest.raises(ReleaseSafetyError, match="100 percent"):
         inspect_service(
             split_traffic,
+            revision_payload(),
             expected_service="fraeno-github-webhook",
             expected_revision="fraeno-github-webhook-00008-abc",
             expected_service_account=WEBHOOK_ACCOUNT,
         )
 
-    tagged = service_payload(image="old.example/control-plane:v1")
+    tagged = revision_payload(image="old.example/control-plane:v1")
     with pytest.raises(ReleaseSafetyError, match="sha256"):
         inspect_service(
+            service_payload(),
             tagged,
+            expected_service="fraeno-github-webhook",
+            expected_revision="fraeno-github-webhook-00008-abc",
+            expected_service_account=WEBHOOK_ACCOUNT,
+        )
+
+    with pytest.raises(ReleaseSafetyError, match="expected Cloud Run revision"):
+        inspect_service(
+            service_payload(),
+            revision_payload(name="fraeno-github-webhook-00009-failed"),
             expected_service="fraeno-github-webhook",
             expected_revision="fraeno-github-webhook-00008-abc",
             expected_service_account=WEBHOOK_ACCOUNT,

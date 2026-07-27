@@ -49,36 +49,25 @@ def validate_control_release_inputs(
 
 
 def inspect_service(
-    payload: Any,
+    service_payload: Any,
+    revision_payload: Any,
     *,
     expected_service: str,
     expected_revision: str,
     expected_service_account: str,
 ) -> dict[str, str]:
-    if not isinstance(payload, dict):
+    if not isinstance(service_payload, dict):
         raise ReleaseSafetyError("Cloud Run service payload must be an object")
-    metadata = _object(payload, "metadata")
-    spec = _object(payload, "spec")
-    template = _object(spec, "template")
-    template_spec = _object(template, "spec")
-    status = _object(payload, "status")
+    if not isinstance(revision_payload, dict):
+        raise ReleaseSafetyError("Cloud Run revision payload must be an object")
+    metadata = _object(service_payload, "metadata")
+    status = _object(service_payload, "status")
 
     if metadata.get("name") != expected_service:
         raise ReleaseSafetyError(
             f"expected Cloud Run service {expected_service}, "
             f"got {metadata.get('name')!r}"
         )
-    if status.get("latestReadyRevisionName") != expected_revision:
-        raise ReleaseSafetyError(
-            f"{expected_service} latest ready revision is not {expected_revision}"
-        )
-    service_account = template_spec.get("serviceAccountName")
-    if service_account != expected_service_account:
-        raise ReleaseSafetyError(
-            f"{expected_service} must use service account "
-            f"{expected_service_account}"
-        )
-
     traffic = status.get("traffic")
     if not isinstance(traffic, list):
         raise ReleaseSafetyError(f"{expected_service} has no traffic state")
@@ -97,14 +86,42 @@ def inspect_service(
             f"{expected_revision}"
         )
 
-    containers = template_spec.get("containers")
+    revision_metadata = _object(revision_payload, "metadata")
+    if revision_metadata.get("name") != expected_revision:
+        raise ReleaseSafetyError(
+            f"expected Cloud Run revision {expected_revision}, "
+            f"got {revision_metadata.get('name')!r}"
+        )
+    revision_labels = _object(revision_metadata, "labels")
+    if revision_labels.get("serving.knative.dev/service") != expected_service:
+        raise ReleaseSafetyError(
+            f"{expected_revision} does not belong to {expected_service}"
+        )
+    revision_spec = _object(revision_payload, "spec")
+    service_account = revision_spec.get("serviceAccountName")
+    if service_account != expected_service_account:
+        raise ReleaseSafetyError(
+            f"{expected_revision} must use service account "
+            f"{expected_service_account}"
+        )
+    revision_status = _object(revision_payload, "status")
+    conditions = revision_status.get("conditions")
+    if not isinstance(conditions, list) or not any(
+        isinstance(condition, dict)
+        and condition.get("type") == "Ready"
+        and condition.get("status") == "True"
+        for condition in conditions
+    ):
+        raise ReleaseSafetyError(f"{expected_revision} is not ready")
+
+    containers = revision_spec.get("containers")
     if not isinstance(containers, list) or len(containers) != 1:
         raise ReleaseSafetyError(
-            f"{expected_service} must have exactly one container"
+            f"{expected_revision} must have exactly one container"
         )
     container = containers[0]
     if not isinstance(container, dict):
-        raise ReleaseSafetyError(f"{expected_service} container is invalid")
+        raise ReleaseSafetyError(f"{expected_revision} container is invalid")
     image = container.get("image")
     if (
         not isinstance(image, str)
@@ -112,7 +129,11 @@ def inspect_service(
         or DIGEST.fullmatch(image.rsplit("@", maxsplit=1)[-1]) is None
     ):
         raise ReleaseSafetyError(
-            f"{expected_service} image must be pinned by sha256 digest"
+            f"{expected_revision} image must be pinned by sha256 digest"
+        )
+    if revision_status.get("imageDigest") not in (None, image):
+        raise ReleaseSafetyError(
+            f"{expected_revision} status digest does not match its container"
         )
     url = status.get("url")
     if not isinstance(url, str) or not url.startswith("https://"):
@@ -282,6 +303,7 @@ def _parser() -> argparse.ArgumentParser:
 
     inspect = commands.add_parser("inspect-service")
     inspect.add_argument("--input", type=Path, required=True)
+    inspect.add_argument("--revision-input", type=Path, required=True)
     inspect.add_argument("--service", required=True)
     inspect.add_argument("--revision", required=True)
     inspect.add_argument("--service-account", required=True)
@@ -316,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "inspect-service":
             snapshot = inspect_service(
                 _load_json(args.input),
+                _load_json(args.revision_input),
                 expected_service=args.service,
                 expected_revision=args.revision,
                 expected_service_account=args.service_account,
