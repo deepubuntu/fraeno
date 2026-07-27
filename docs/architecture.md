@@ -76,10 +76,15 @@ returns one target, and the provider can prove the target is newer or
 immutable. Every candidate keeps its release date, registry source, and
 provenance.
 
-The production catalog reads public package and source registries. Tests use a
-committed catalog fixture, so the suite has no registry or internet dependency.
-The fixture represents ROS 2 Humble on Ubuntu 22.04 and exercises all five
-providers through the public command line.
+The production catalog reads public package and source registries for Python,
+Docker, APT, and vcstool. A rosdep declaration does not contain the installed
+system-package version, so the provider requires a catalog or resolver to
+supply both the current and target package evidence. It returns a typed refusal
+when that target-specific evidence is absent.
+
+Tests use a committed catalog fixture, so the suite has no registry or internet
+dependency. The fixture represents ROS 2 Humble on Ubuntu 22.04 and exercises
+all five provider contracts through the public command line.
 
 ### Resolved dependency graph
 

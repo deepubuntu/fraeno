@@ -123,10 +123,15 @@ Automated update pull requests use the repository’s trusted scheduled workflow
 ## Update discovery
 
 `fraeno outdated .` checks exact Python pins, Docker image tags, pinned APT
-packages, vcstool refs, and resolved rosdep packages. Each proposed update
-includes the current value, target value, registry source, release date, and
-the evidence used to choose it. Fraeno refuses unclear choices instead of
-guessing between branches, package sources, or conflicting pins.
+packages, and vcstool refs. The rosdep provider accepts target-specific current
+and newer package evidence from a catalog. Until that evidence exists, it
+returns an explicit refusal instead of pretending an unversioned `package.xml`
+key is an installed package version.
+
+Each proposed update includes the current value, target value, registry source,
+release date, and the evidence used to choose it. Fraeno refuses unclear
+choices instead of guessing between branches, package sources, or conflicting
+pins.
 
 For an offline or repeatable run, pass a catalog fixture:
 
