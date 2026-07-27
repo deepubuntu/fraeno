@@ -193,6 +193,13 @@ fraeno outdated fixtures/update_discovery/robot_repo \
 declaration. The scheduled update workflow then opens a pull request and lets
 the complete robot integration check decide whether it can merge.
 
+For production orchestration, `fraeno propose-update` applies the repository's
+allow, ignore, update type, cooldown, grouping, schedule, and open pull request
+limits. One dependency per pull request is the default. Deterministic branches
+prevent duplicate and superseded proposals, and each pull request explains the
+changed manifests, old and new resolutions, validation scope, and missing
+evidence. See [the update policy guide](docs/update-policy.md).
+
 ## Honest limits
 
 - rosdep and CMake dependencies are discovered but not automatically rewritten in v1.

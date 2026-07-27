@@ -1,11 +1,13 @@
 from pathlib import Path
 
 import httpx
+import pytest
 
 from fraeno.scanner import RepositoryScanner
 from fraeno.updates import (
     apply_next_python_update,
     apply_update,
+    apply_updates,
     find_python_updates,
 )
 
@@ -101,3 +103,23 @@ def test_applies_next_update_one_at_a_time(tmp_path: Path) -> None:
     assert result is not None
     assert result.dependency == "python:alpha"
     assert requirements.read_text() == "alpha==1.1.0\nbeta==1.0.0\n"
+
+
+def test_grouped_updates_are_planned_before_any_file_is_written(
+    tmp_path: Path,
+) -> None:
+    requirements = tmp_path / "requirements.txt"
+    requirements.write_text("alpha==1.0.0\n")
+    report = RepositoryScanner(tmp_path).scan()
+
+    with pytest.raises(ValueError, match="dependency not found"):
+        apply_updates(
+            tmp_path,
+            report,
+            (
+                ("python:alpha", "1.1.0"),
+                ("python:missing", "2.0.0"),
+            ),
+        )
+
+    assert requirements.read_text() == "alpha==1.0.0\n"

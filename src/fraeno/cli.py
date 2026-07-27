@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -19,9 +20,11 @@ from fraeno.lockfile import (
 from fraeno.models import ScanReport
 from fraeno.scanner import RepositoryScanner
 from fraeno.update_discovery import FixtureUpdateCatalog, discover_updates
+from fraeno.update_policy import OpenUpdatePullRequest, plan_updates
 from fraeno.updates import (
     apply_next_update,
     apply_update,
+    apply_updates,
 )
 from fraeno.validation.compare import Outcome, compare_systems
 from fraeno.validation.contract import CapturedWorkspace, assemble_validation
@@ -84,6 +87,24 @@ def build_parser() -> argparse.ArgumentParser:
     update_next.add_argument("--output", "-o", type=Path)
     update_next.add_argument("--catalog", type=Path)
     _add_target_options(update_next)
+
+    propose_update = commands.add_parser(
+        "propose-update",
+        help="Apply the next policy-approved update proposal.",
+    )
+    propose_update.add_argument("repository", nargs="?", default=".")
+    propose_update.add_argument(
+        "--config",
+        type=Path,
+        default=Path(".fraeno.yml"),
+    )
+    propose_update.add_argument("--open-pull-requests", type=Path)
+    propose_update.add_argument("--catalog", type=Path)
+    propose_update.add_argument("--now")
+    propose_update.add_argument("--ignore-schedule", action="store_true")
+    propose_update.add_argument("--dry-run", action="store_true")
+    propose_update.add_argument("--output", "-o", type=Path)
+    _add_target_options(propose_update)
 
     compare = commands.add_parser(
         "compare", help="Compare two robot-system observation snapshots."
@@ -154,6 +175,8 @@ def main(argv: list[str] | None = None) -> int:
             return _update(args)
         if args.command == "update-next":
             return _update_next(args)
+        if args.command == "propose-update":
+            return _propose_update(args)
         if args.command == "compare":
             return _compare(args)
         if args.command == "validate":
@@ -262,6 +285,60 @@ def _update_next(args: argparse.Namespace) -> int:
     return 0
 
 
+def _propose_update(args: argparse.Namespace) -> int:
+    root = Path(args.repository).resolve()
+    config_path = args.config
+    if not config_path.is_absolute():
+        config_path = root / config_path
+    config = load_config(config_path)
+    report = RepositoryScanner(root).scan()
+    catalog = FixtureUpdateCatalog.from_path(args.catalog) if args.catalog else None
+    discovery = discover_updates(
+        report,
+        target=_target_from_args(args, report),
+        catalog=catalog,
+    )
+    now = _parse_now(args.now)
+    open_pull_requests = _open_pull_requests(args.open_pull_requests)
+    plan = plan_updates(
+        discovery.candidates,
+        config.updates,
+        now=now,
+        open_pull_requests=open_pull_requests,
+        ignore_schedule=args.ignore_schedule,
+    )
+    proposal = plan.proposals[0] if plan.proposals else None
+    results = (
+        apply_updates(
+            root,
+            report,
+            tuple(
+                (candidate.identity, candidate.target)
+                for candidate in proposal.candidates
+            ),
+            dry_run=args.dry_run,
+        )
+        if proposal
+        else ()
+    )
+    proposal_payload = proposal.to_dict(config.validation) if proposal else None
+    if proposal_payload is not None:
+        proposal_payload["results"] = [result.to_dict() for result in results]
+    _write_or_print(
+        {
+            "schema_version": 3,
+            "updated": bool(results),
+            "dry_run": bool(args.dry_run),
+            "proposal": proposal_payload,
+            "plan": plan.to_dict(config.validation),
+            "refusals": [item.to_dict() for item in discovery.refusals],
+            "warnings": report.warnings + list(discovery.warnings),
+        },
+        args.output,
+    )
+    return 0
+
+
 def _compare(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     baseline = _observation_from_file(args.baseline)
@@ -353,6 +430,31 @@ def _read_object(path: Path) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return raw
+
+
+def _open_pull_requests(
+    path: Path | None,
+) -> tuple[OpenUpdatePullRequest, ...]:
+    if path is None:
+        return ()
+    raw = json.loads(path.read_text())
+    if not isinstance(raw, list) or not all(isinstance(item, dict) for item in raw):
+        raise ValueError("open pull requests must be a JSON list of objects")
+    return tuple(
+        OpenUpdatePullRequest.from_mapping(item) for item in raw
+    )
+
+
+def _parse_now(value: str | None) -> datetime:
+    if value is None:
+        return datetime.now(timezone.utc)
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("--now must be an ISO 8601 timestamp") from error
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _outcome_code(outcome: Outcome) -> int:

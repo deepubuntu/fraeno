@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -50,11 +51,58 @@ class ValidationConfig:
     maximum_topic_rate_regression_percent: float = 20.0
 
 
+UPDATE_TYPES = frozenset(
+    {"major", "minor", "patch", "digest", "revision", "unknown"}
+)
+SCHEDULE_INTERVALS = frozenset({"daily", "weekly", "monthly", "manual"})
+WEEKDAYS = (
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+)
+
+
+@dataclass(frozen=True)
+class UpdateRuleConfig:
+    dependency: str
+    update_types: frozenset[str] = frozenset()
+    cooldown_days: int | None = None
+
+
+@dataclass(frozen=True)
+class UpdateGroupConfig:
+    name: str
+    patterns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class UpdateScheduleConfig:
+    interval: str = "weekly"
+    day: str = "monday"
+    day_of_month: int = 1
+
+
+@dataclass(frozen=True)
+class UpdatePolicyConfig:
+    allow: tuple[UpdateRuleConfig, ...] = ()
+    ignore: tuple[UpdateRuleConfig, ...] = ()
+    update_types: frozenset[str] = UPDATE_TYPES
+    cooldown_days: int = 0
+    groups: tuple[UpdateGroupConfig, ...] = ()
+    schedule: UpdateScheduleConfig = UpdateScheduleConfig()
+    max_open_pull_requests: int = 5
+
+
 @dataclass(frozen=True)
 class FraenoConfig:
     version: int
     project_name: str
     validation: ValidationConfig
+    updates: UpdatePolicyConfig = UpdatePolicyConfig()
 
 
 def _command(value: Any, field_name: str) -> tuple[str, ...]:
@@ -173,6 +221,228 @@ def _ros2_observer(
     )
 
 
+def _update_types(value: Any, field_name: str) -> frozenset[str]:
+    if not isinstance(value, list) or not value or not all(
+        isinstance(item, str) and item for item in value
+    ):
+        raise ConfigError(f"{field_name} must be a non-empty list of update types")
+    normalized = frozenset(item.lower() for item in value)
+    unsupported = sorted(normalized - UPDATE_TYPES)
+    if unsupported:
+        raise ConfigError(
+            f"{field_name} contains unsupported update types: "
+            + ", ".join(unsupported)
+        )
+    return normalized
+
+
+def _nonnegative_integer(value: Any, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigError(f"{field_name} must be a non-negative integer")
+    if value < 0:
+        raise ConfigError(f"{field_name} must be a non-negative integer")
+    return int(value)
+
+
+def _rules(value: Any, field_name: str) -> tuple[UpdateRuleConfig, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ConfigError(f"{field_name} must be a list")
+    rules: list[UpdateRuleConfig] = []
+    for index, raw_rule in enumerate(value):
+        item_name = f"{field_name}[{index}]"
+        dependency: str
+        rule_types: frozenset[str]
+        cooldown_days: int | None
+        if isinstance(raw_rule, str):
+            dependency = raw_rule
+            rule_types = frozenset()
+            cooldown_days = None
+        elif isinstance(raw_rule, dict):
+            unsupported = sorted(
+                set(raw_rule) - {"dependency", "update_types", "cooldown_days"}
+            )
+            if unsupported:
+                raise ConfigError(
+                    f"{item_name} contains unsupported fields: "
+                    + ", ".join(unsupported)
+                )
+            raw_dependency = raw_rule.get("dependency")
+            if not isinstance(raw_dependency, str) or not raw_dependency:
+                raise ConfigError(f"{item_name}.dependency is required")
+            dependency = raw_dependency
+            raw_types = raw_rule.get("update_types")
+            rule_types = (
+                _update_types(raw_types, f"{item_name}.update_types")
+                if raw_types is not None
+                else frozenset()
+            )
+            raw_cooldown = raw_rule.get("cooldown_days")
+            cooldown_days = (
+                _nonnegative_integer(raw_cooldown, f"{item_name}.cooldown_days")
+                if raw_cooldown is not None
+                else None
+            )
+        else:
+            raise ConfigError(f"{item_name} must be a dependency pattern or object")
+        if (
+            not dependency
+            or dependency != dependency.strip()
+            or any(character.isspace() for character in dependency)
+        ):
+            raise ConfigError(
+                f"{item_name}.dependency must be a non-empty pattern without whitespace"
+            )
+        rules.append(
+            UpdateRuleConfig(
+                dependency=dependency.lower(),
+                update_types=rule_types,
+                cooldown_days=cooldown_days,
+            )
+        )
+    return tuple(rules)
+
+
+def _groups(value: Any) -> tuple[UpdateGroupConfig, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ConfigError("updates.groups must be a list")
+    groups: list[UpdateGroupConfig] = []
+    seen_names: set[str] = set()
+    for index, raw_group in enumerate(value):
+        field_name = f"updates.groups[{index}]"
+        if not isinstance(raw_group, dict):
+            raise ConfigError(f"{field_name} must be an object")
+        unsupported = sorted(set(raw_group) - {"name", "patterns"})
+        if unsupported:
+            raise ConfigError(
+                f"{field_name} contains unsupported fields: "
+                + ", ".join(unsupported)
+            )
+        name = raw_group.get("name")
+        patterns = raw_group.get("patterns")
+        if not isinstance(name, str) or not name.strip():
+            raise ConfigError(f"{field_name}.name is required")
+        normalized_name = name.strip()
+        if (
+            len(normalized_name) > 50
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]*", normalized_name)
+            is None
+        ):
+            raise ConfigError(
+                f"{field_name}.name must use 50 or fewer letters, numbers, "
+                "spaces, dots, underscores, or hyphens"
+            )
+        if normalized_name.lower() in seen_names:
+            raise ConfigError("updates.groups names must be unique")
+        seen_names.add(normalized_name.lower())
+        if not isinstance(patterns, list) or not patterns or not all(
+            isinstance(pattern, str) and pattern and pattern == pattern.strip()
+            and not any(character.isspace() for character in pattern)
+            for pattern in patterns
+        ):
+            raise ConfigError(
+                f"{field_name}.patterns must be a non-empty list of patterns"
+            )
+        groups.append(
+            UpdateGroupConfig(
+                name=normalized_name,
+                patterns=tuple(pattern.lower() for pattern in patterns),
+            )
+        )
+    return tuple(groups)
+
+
+def _schedule(value: Any) -> UpdateScheduleConfig:
+    if value is None:
+        return UpdateScheduleConfig()
+    if isinstance(value, str):
+        raw_schedule: dict[str, Any] = {"interval": value}
+    elif isinstance(value, dict):
+        raw_schedule = value
+    else:
+        raise ConfigError("updates.schedule must be an interval or object")
+    unsupported = sorted(
+        set(raw_schedule) - {"interval", "day", "day_of_month"}
+    )
+    if unsupported:
+        raise ConfigError(
+            "updates.schedule contains unsupported fields: "
+            + ", ".join(unsupported)
+        )
+    interval = raw_schedule.get("interval", "weekly")
+    if not isinstance(interval, str) or interval.lower() not in SCHEDULE_INTERVALS:
+        raise ConfigError(
+            "updates.schedule.interval must be daily, weekly, monthly, or manual"
+        )
+    normalized_interval = interval.lower()
+    day = raw_schedule.get("day", "monday")
+    if not isinstance(day, str) or day.lower() not in WEEKDAYS:
+        raise ConfigError(
+            "updates.schedule.day must be a lowercase weekday name"
+        )
+    day_of_month = _nonnegative_integer(
+        raw_schedule.get("day_of_month", 1),
+        "updates.schedule.day_of_month",
+    )
+    if not 1 <= day_of_month <= 28:
+        raise ConfigError("updates.schedule.day_of_month must be between 1 and 28")
+    return UpdateScheduleConfig(
+        interval=normalized_interval,
+        day=day.lower(),
+        day_of_month=day_of_month,
+    )
+
+
+def _update_policy(value: Any) -> UpdatePolicyConfig:
+    if value is None:
+        return UpdatePolicyConfig()
+    if not isinstance(value, dict):
+        raise ConfigError("updates must be an object")
+    unsupported = sorted(
+        set(value)
+        - {
+            "allow",
+            "ignore",
+            "update_types",
+            "cooldown_days",
+            "groups",
+            "schedule",
+            "max_open_pull_requests",
+        }
+    )
+    if unsupported:
+        raise ConfigError(
+            "updates contains unsupported fields: " + ", ".join(unsupported)
+        )
+    raw_types = value.get("update_types")
+    update_types = (
+        _update_types(raw_types, "updates.update_types")
+        if raw_types is not None
+        else UPDATE_TYPES
+    )
+    max_open = value.get("max_open_pull_requests", 5)
+    if isinstance(max_open, bool) or not isinstance(max_open, int):
+        raise ConfigError("updates.max_open_pull_requests must be a positive integer")
+    if max_open <= 0:
+        raise ConfigError(
+            "updates.max_open_pull_requests must be a positive integer"
+        )
+    return UpdatePolicyConfig(
+        allow=_rules(value.get("allow"), "updates.allow"),
+        ignore=_rules(value.get("ignore"), "updates.ignore"),
+        update_types=update_types,
+        cooldown_days=_nonnegative_integer(
+            value.get("cooldown_days", 0), "updates.cooldown_days"
+        ),
+        groups=_groups(value.get("groups")),
+        schedule=_schedule(value.get("schedule")),
+        max_open_pull_requests=max_open,
+    )
+
+
 def load_config(path: Path) -> FraenoConfig:
     raw = yaml.safe_load(path.read_text())
     if not isinstance(raw, dict):
@@ -283,4 +553,5 @@ def load_config(path: Path) -> FraenoConfig:
             minimum_topic_rates_hz=minimum_topic_rates_hz,
             maximum_topic_rate_regression_percent=maximum_regression,
         ),
+        updates=_update_policy(raw.get("updates")),
     )

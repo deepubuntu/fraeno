@@ -3,6 +3,20 @@ version: 1
 project:
   name: fraeno-live-ros2-fixture
 
+updates:
+  update_types:
+    - major
+    - minor
+    - patch
+    - digest
+    - revision
+    - unknown
+  cooldown_days: 7
+  schedule:
+    interval: weekly
+    day: monday
+  max_open_pull_requests: 5
+
 validation:
   steps:
     - name: build ROS 2 fixture
