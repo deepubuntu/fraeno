@@ -21,6 +21,7 @@ CONTROL_IMAGE = (
 CONTROL_COMMIT = "a" * 40
 CONTROL_DIGEST = "sha256:" + ("b" * 64)
 SECOND_CONTROL_DIGEST = "sha256:" + ("c" * 64)
+RUNTIME_CONTROL_DIGEST = "sha256:" + ("d" * 64)
 CONTROL_PACKAGE_ROOT = (
     "projects/deepubuntu-32f9e/locations/us-central1/repositories/"
     "fraeno-control-plane/packages/control-plane"
@@ -70,6 +71,93 @@ def _run_registry_tag_resolver(
     semantic = semantic_path.read_text().strip() if semantic_path.exists() else ""
     commit = commit_path.read_text().strip() if commit_path.exists() else ""
     return result, semantic, commit
+
+
+def _runtime_digest_resolver_source() -> str:
+    workflow = CONTROL_RELEASE_WORKFLOW.read_text()
+    block = workflow.split("# RUNTIME_DIGEST_RESOLVER_START", maxsplit=1)[
+        1
+    ].split(
+        "# RUNTIME_DIGEST_RESOLVER_END",
+        maxsplit=1,
+    )[0]
+    source = block.split("<<'PY'\n", maxsplit=1)[1].rsplit(
+        "\n          PY",
+        maxsplit=1,
+    )[0]
+    return textwrap.dedent(source)
+
+
+def _run_runtime_digest_resolver(
+    tmp_path: Path,
+    manifest: object,
+    published_digest: str = CONTROL_DIGEST,
+) -> tuple[subprocess.CompletedProcess[str], str]:
+    manifest_path = tmp_path / "image-index.json"
+    output_path = tmp_path / "runtime-digest.txt"
+    manifest_path.write_text(json.dumps(manifest))
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            str(manifest_path),
+            published_digest,
+            str(output_path),
+        ],
+        input=_runtime_digest_resolver_source(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    runtime_digest = (
+        output_path.read_text().strip() if output_path.exists() else ""
+    )
+    return result, runtime_digest
+
+
+def _runtime_image_validator_source() -> str:
+    workflow = CONTROL_RELEASE_WORKFLOW.read_text()
+    block = workflow.split("# RUNTIME_IMAGE_VALIDATOR_START", maxsplit=1)[
+        1
+    ].split(
+        "# RUNTIME_IMAGE_VALIDATOR_END",
+        maxsplit=1,
+    )[0]
+    source = block.split("<<'PY'\n", maxsplit=1)[1].rsplit(
+        "\n          PY",
+        maxsplit=1,
+    )[0]
+    return textwrap.dedent(source)
+
+
+def _run_runtime_image_validator(
+    tmp_path: Path,
+    runtime_image: str,
+) -> tuple[subprocess.CompletedProcess[str], dict[str, object] | None]:
+    for role in ("webhook", "worker"):
+        (tmp_path / f"final-{role}.json").write_text(
+            json.dumps({"role": role, "image": runtime_image})
+        )
+    published_image = f"{CONTROL_IMAGE}@{CONTROL_DIGEST}"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            "2026-07-27T20:00:00Z",
+            "2026-07-27T20:01:00Z",
+            "2026-07-27T20:02:00Z",
+            published_image,
+            RUNTIME_CONTROL_DIGEST,
+        ],
+        input=_runtime_image_validator_source(),
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=tmp_path,
+    )
+    output_path = tmp_path / "final-state.json"
+    output = json.loads(output_path.read_text()) if output_path.exists() else None
+    return result, output
 
 
 def test_release_workflow_is_manual_and_minimally_privileged() -> None:
@@ -446,6 +534,182 @@ def test_registry_tag_resolver_fails_closed_on_invalid_inventory(
     assert message in result.stderr
 
 
+def test_runtime_digest_resolver_selects_the_linux_amd64_image(
+    tmp_path: Path,
+) -> None:
+    manifest = {
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.oci.image.index.v1+json",
+        "manifests": [
+            {
+                "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                "digest": RUNTIME_CONTROL_DIGEST,
+                "size": 1234,
+                "platform": {"os": "linux", "architecture": "amd64"},
+            },
+            {
+                "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                "digest": SECOND_CONTROL_DIGEST,
+                "size": 456,
+                "platform": {"os": "unknown", "architecture": "unknown"},
+                "annotations": {
+                    "vnd.docker.reference.type": "attestation-manifest"
+                },
+            },
+        ],
+    }
+
+    result, runtime_digest = _run_runtime_digest_resolver(
+        tmp_path,
+        manifest,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert runtime_digest == RUNTIME_CONTROL_DIGEST
+
+
+def test_runtime_digest_resolver_accepts_a_single_image_manifest(
+    tmp_path: Path,
+) -> None:
+    manifest = {
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    }
+
+    result, runtime_digest = _run_runtime_digest_resolver(
+        tmp_path,
+        manifest,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert runtime_digest == CONTROL_DIGEST
+
+
+@pytest.mark.parametrize(
+    ("manifest", "message"),
+    [
+        (
+            {"schemaVersion": 1},
+            "must use schema version 2",
+        ),
+        (
+            {
+                "schemaVersion": 2,
+                "mediaType": "application/octet-stream",
+            },
+            "unsupported media type",
+        ),
+        (
+            {
+                "schemaVersion": 2,
+                "mediaType": "application/vnd.oci.image.index.v1+json",
+                "manifests": [],
+            },
+            "exactly one linux/amd64 image",
+        ),
+        (
+            {
+                "schemaVersion": 2,
+                "mediaType": "application/vnd.oci.image.index.v1+json",
+                "manifests": [
+                    {
+                        "mediaType": (
+                            "application/vnd.oci.image.manifest.v1+json"
+                        ),
+                        "digest": CONTROL_DIGEST,
+                        "size": 123,
+                        "platform": {
+                            "os": "linux",
+                            "architecture": "amd64",
+                        },
+                    },
+                    {
+                        "mediaType": (
+                            "application/vnd.oci.image.manifest.v1+json"
+                        ),
+                        "digest": RUNTIME_CONTROL_DIGEST,
+                        "size": 456,
+                        "platform": {
+                            "os": "linux",
+                            "architecture": "amd64",
+                        },
+                    },
+                ],
+            },
+            "exactly one linux/amd64 image",
+        ),
+        (
+            {
+                "schemaVersion": 2,
+                "mediaType": "application/vnd.oci.image.index.v1+json",
+                "manifests": [
+                    {
+                        "mediaType": "application/octet-stream",
+                        "digest": RUNTIME_CONTROL_DIGEST,
+                        "size": 123,
+                        "platform": {
+                            "os": "linux",
+                            "architecture": "amd64",
+                        },
+                    }
+                ],
+            },
+            "is not an image manifest",
+        ),
+    ],
+)
+def test_runtime_digest_resolver_fails_closed(
+    tmp_path: Path,
+    manifest: object,
+    message: str,
+) -> None:
+    result, runtime_digest = _run_runtime_digest_resolver(
+        tmp_path,
+        manifest,
+    )
+
+    assert result.returncode != 0
+    assert runtime_digest == ""
+    assert message in result.stderr
+
+
+def test_runtime_image_validator_preserves_the_resolved_child_image(
+    tmp_path: Path,
+) -> None:
+    runtime_image = f"{CONTROL_IMAGE}@{RUNTIME_CONTROL_DIGEST}"
+
+    result, output = _run_runtime_image_validator(tmp_path, runtime_image)
+
+    assert result.returncode == 0, result.stderr
+    assert output is not None
+    for role in ("webhook", "worker"):
+        service = output[role]
+        assert isinstance(service, dict)
+        assert service["image"] == f"{CONTROL_IMAGE}@{CONTROL_DIGEST}"
+        assert service["runtime_image"] == runtime_image
+    rollback = output["rollback"]
+    assert isinstance(rollback, dict)
+    assert rollback["candidate_restored"] is True
+
+
+@pytest.mark.parametrize(
+    "runtime_image",
+    [
+        f"other.example/project/repository/control-plane@{RUNTIME_CONTROL_DIGEST}",
+        f"{CONTROL_IMAGE}@{SECOND_CONTROL_DIGEST}",
+    ],
+)
+def test_runtime_image_validator_rejects_an_unrelated_runtime_image(
+    tmp_path: Path,
+    runtime_image: str,
+) -> None:
+    result, output = _run_runtime_image_validator(tmp_path, runtime_image)
+
+    assert result.returncode != 0
+    assert output is None
+    assert "runtime image is not part of the published image" in result.stderr
+
+
 def test_control_release_proves_rollback_and_restores_candidate() -> None:
     workflow = CONTROL_RELEASE_WORKFLOW.read_text()
 
@@ -485,6 +749,14 @@ def test_control_release_proves_rollback_and_restores_candidate() -> None:
     assert 'test -n "$PRIVATE_WORKER_ID_TOKEN"' in deploy_step
     assert "worker service URL is not a canonical run.app URL" in workflow
     assert 'parsed.hostname.startswith(f"{service}-")' in workflow
+    assert "--raw > control-plane-image-index.json" in workflow
+    assert "CONTROL_PLANE_RUNTIME_DIGEST" in workflow
+    assert 'actual_digest not in {published_digest, runtime_digest}' in workflow
+    assert 'service["runtime_image"] = runtime_image' in workflow
+    assert 'control_plane["runtime_digest"] = runtime_digest' in workflow
+    assert "control-plane-image-index.json" in workflow[
+        workflow.index("Preserve deployment and rollback evidence") :
+    ]
     candidate = 'set_traffic "$WORKER_SERVICE" "$worker_candidate_revision"'
     rollback = 'set_traffic "$WORKER_SERVICE" "$PREVIOUS_WORKER_REVISION"'
     assert workflow.count(candidate) == 2

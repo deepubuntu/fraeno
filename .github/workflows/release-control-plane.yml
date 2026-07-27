@@ -475,7 +475,7 @@ jobs:
               cd resume-control-plane-evidence
               sha256sum --check fraeno-control-plane-release.json.sha256
             )
-            evidence_digest="$(
+            readarray -t resume_evidence_digests < <(
               python - \
                 "$RELEASE_VERSION" \
                 "$RELEASE_SHA" \
@@ -506,6 +506,9 @@ jobs:
           digest = control.get("digest", "")
           if re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None:
               raise SystemExit("Resume evidence has no valid digest.")
+          runtime_digest = control.get("runtime_digest", "")
+          if re.fullmatch(r"sha256:[0-9a-f]{64}", runtime_digest) is None:
+              raise SystemExit("Resume evidence has no valid runtime digest.")
           if payload.get("rollback", {}).get("candidate_restored") is not True:
               raise SystemExit("Resume evidence did not restore the candidate.")
           expected_url = (
@@ -522,8 +525,11 @@ jobs:
           if not required_checks.issubset(payload.get("release_gate", {})):
               raise SystemExit("Resume evidence is missing release checks.")
           print(digest)
+          print(runtime_digest)
           PY
-            )"
+            )
+            evidence_digest="${resume_evidence_digests[0]}"
+            evidence_runtime_digest="${resume_evidence_digests[1]}"
             if [[ "$resume_digest" != "$evidence_digest" ]]; then
               echo "Existing tag does not match proven resume evidence." >&2
               exit 2
@@ -532,6 +538,8 @@ jobs:
               resume-control-plane-evidence/control-plane-buildkit-metadata.json \
               control-plane-buildkit-metadata.json
             echo "RESUME_CONTROL_PLANE_DIGEST=$resume_digest" \
+              >> "$GITHUB_ENV"
+            echo "RESUME_RUNTIME_DIGEST=$evidence_runtime_digest" \
               >> "$GITHUB_ENV"
           fi
 
@@ -628,38 +636,128 @@ jobs:
 
       - name: Publish or resume immutable release candidate
         run: |
+          set -Eeuo pipefail
           if [[ "$RESUME_CONTROL_PLANE_DIGEST" != "none" ]]; then
-            echo "CONTROL_PLANE_DIGEST=$RESUME_CONTROL_PLANE_DIGEST" \
-              >> "$GITHUB_ENV"
-            echo "CANDIDATE_IMAGE_TAG=resumed-$RESUME_RUN_ID" \
-              >> "$GITHUB_ENV"
-            exit 0
+            digest="$RESUME_CONTROL_PLANE_DIGEST"
+            candidate_tag="resumed-$RESUME_RUN_ID"
+          else
+            candidate_tag="candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            docker buildx build \
+              --file Dockerfile \
+              --label "org.opencontainers.image.revision=$RELEASE_SHA" \
+              --label "org.opencontainers.image.version=$RELEASE_VERSION" \
+              --tag "$CONTROL_PLANE_IMAGE:$candidate_tag" \
+              --sbom=true \
+              --provenance=mode=max \
+              --metadata-file control-plane-buildkit-metadata.json \
+              --push \
+              .
+            digest="$(
+              python -m fraeno.release_safety extract-digest \
+                --input control-plane-buildkit-metadata.json
+            )"
+            published_digest="$(
+              gcloud artifacts docker images describe \
+                "$CONTROL_PLANE_IMAGE:$candidate_tag" \
+                --project "$GCP_PROJECT_ID" \
+                --format "value(image_summary.digest)"
+            )"
+            test "$published_digest" = "$digest"
           fi
-          candidate_tag="candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          docker buildx build \
-            --file Dockerfile \
-            --label "org.opencontainers.image.revision=$RELEASE_SHA" \
-            --label "org.opencontainers.image.version=$RELEASE_VERSION" \
-            --tag "$CONTROL_PLANE_IMAGE:$candidate_tag" \
-            --sbom=true \
-            --provenance=mode=max \
-            --metadata-file control-plane-buildkit-metadata.json \
-            --push \
-            .
-          digest="$(
-            python -m fraeno.release_safety extract-digest \
-              --input control-plane-buildkit-metadata.json
-          )"
-          published_digest="$(
-            gcloud artifacts docker images describe \
-              "$CONTROL_PLANE_IMAGE:$candidate_tag" \
-              --project "$GCP_PROJECT_ID" \
-              --format "value(image_summary.digest)"
-          )"
-          test "$published_digest" = "$digest"
           docker buildx imagetools inspect \
-            "$CONTROL_PLANE_IMAGE@$digest" >/dev/null
+            "$CONTROL_PLANE_IMAGE@$digest" \
+            --raw > control-plane-image-index.json
+          # RUNTIME_DIGEST_RESOLVER_START
+          cat > "$RUNNER_TEMP/resolve-runtime-digest.py" <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          index_path, published_digest, output_path = sys.argv[1:]
+          digest_pattern = re.compile(r"sha256:[0-9a-f]{64}")
+          if digest_pattern.fullmatch(published_digest) is None:
+              raise SystemExit("Published image digest is invalid.")
+          payload = json.loads(Path(index_path).read_text())
+          if not isinstance(payload, dict) or payload.get("schemaVersion") != 2:
+              raise SystemExit("Published image manifest must use schema version 2.")
+          media_type = payload.get("mediaType")
+          image_manifests = {
+              "application/vnd.docker.distribution.manifest.v2+json",
+              "application/vnd.oci.image.manifest.v1+json",
+          }
+          image_indexes = {
+              "application/vnd.docker.distribution.manifest.list.v2+json",
+              "application/vnd.oci.image.index.v1+json",
+          }
+          if media_type in image_manifests:
+              runtime_digest = published_digest
+          elif media_type in image_indexes:
+              manifests = payload.get("manifests")
+              if not isinstance(manifests, list):
+                  raise SystemExit("Published image index has no manifest list.")
+              matches = []
+              for descriptor in manifests:
+                  if not isinstance(descriptor, dict):
+                      raise SystemExit(
+                          "Published image index contains a non-object descriptor."
+                      )
+                  platform = descriptor.get("platform")
+                  if not isinstance(platform, dict):
+                      continue
+                  if (
+                      platform.get("os") != "linux"
+                      or platform.get("architecture") != "amd64"
+                  ):
+                      continue
+                  descriptor_media_type = descriptor.get("mediaType")
+                  descriptor_digest = descriptor.get("digest")
+                  descriptor_size = descriptor.get("size")
+                  if descriptor_media_type not in image_manifests:
+                      raise SystemExit(
+                          "linux/amd64 descriptor is not an image manifest."
+                      )
+                  if (
+                      not isinstance(descriptor_digest, str)
+                      or digest_pattern.fullmatch(descriptor_digest) is None
+                  ):
+                      raise SystemExit(
+                          "linux/amd64 descriptor has an invalid digest."
+                      )
+                  if (
+                      not isinstance(descriptor_size, int)
+                      or isinstance(descriptor_size, bool)
+                      or descriptor_size <= 0
+                  ):
+                      raise SystemExit(
+                          "linux/amd64 descriptor has an invalid size."
+                      )
+                  matches.append(descriptor_digest)
+              if len(matches) != 1:
+                  raise SystemExit(
+                      "Published image index must contain exactly one "
+                      "linux/amd64 image."
+                  )
+              runtime_digest = matches[0]
+          else:
+              raise SystemExit("Published image has an unsupported media type.")
+          Path(output_path).write_text(runtime_digest + "\n")
+          PY
+          # RUNTIME_DIGEST_RESOLVER_END
+          python "$RUNNER_TEMP/resolve-runtime-digest.py" \
+            control-plane-image-index.json \
+            "$digest" \
+            control-plane-runtime-digest.txt
+          runtime_digest="$(<control-plane-runtime-digest.txt)"
+          if [[ "$RESUME_CONTROL_PLANE_DIGEST" != "none" ]] \
+            && [[ "$runtime_digest" != "$RESUME_RUNTIME_DIGEST" ]]
+          then
+            echo "Runtime digest does not match proven resume evidence." >&2
+            exit 2
+          fi
           echo "CONTROL_PLANE_DIGEST=$digest" >> "$GITHUB_ENV"
+          echo "CONTROL_PLANE_RUNTIME_DIGEST=$runtime_digest" \
+            >> "$GITHUB_ENV"
           echo "CANDIDATE_IMAGE_TAG=$candidate_tag" >> "$GITHUB_ENV"
 
       - name: Mint the private worker smoke token
@@ -899,18 +997,36 @@ jobs:
             --revision "$worker_candidate_revision" \
             --service-account "$WORKER_RUNTIME_SERVICE_ACCOUNT" \
             --output final-worker.json
+          # RUNTIME_IMAGE_VALIDATOR_START
           python - \
             "$candidate_smoke_tested_at" \
             "$previous_smoke_tested_at" \
-            "$candidate_restored_at" <<'PY'
+            "$candidate_restored_at" \
+            "$image_reference" \
+            "$CONTROL_PLANE_RUNTIME_DIGEST" <<'PY'
           import json
           import sys
 
-          candidate, previous, restored = sys.argv[1:]
+          candidate, previous, restored, published_image, runtime_digest = sys.argv[1:]
+          repository, published_digest = published_image.rsplit("@", maxsplit=1)
+          services = {}
+          for role in ("webhook", "worker"):
+              service = json.load(open(f"final-{role}.json"))
+              runtime_image = service["image"]
+              runtime_repository, actual_digest = runtime_image.rsplit("@", maxsplit=1)
+              if (
+                  runtime_repository != repository
+                  or actual_digest not in {published_digest, runtime_digest}
+              ):
+                  raise SystemExit(
+                      f"{role} runtime image is not part of the published image"
+                  )
+              service["runtime_image"] = runtime_image
+              service["image"] = published_image
+              services[role] = service
           json.dump(
               {
-                  "webhook": json.load(open("final-webhook.json")),
-                  "worker": json.load(open("final-worker.json")),
+                  **services,
                   "rollback": {
                       "candidate_smoke_tested_at": candidate,
                       "previous_smoke_tested_at": previous,
@@ -923,6 +1039,7 @@ jobs:
               sort_keys=True,
           )
           PY
+          # RUNTIME_IMAGE_VALIDATOR_END
 
           python -m fraeno.control_release write-manifest \
             --version "$RELEASE_VERSION" \
@@ -938,6 +1055,23 @@ jobs:
             --previous-state previous-state.json \
             --final-state final-state.json \
             --output fraeno-control-plane-release.json
+          python - "$CONTROL_PLANE_RUNTIME_DIGEST" <<'PY'
+          import json
+          import sys
+
+          runtime_digest = sys.argv[1]
+          manifest = json.load(open("fraeno-control-plane-release.json"))
+          final_state = json.load(open("final-state.json"))
+          control_plane = manifest["control_plane"]
+          control_plane["runtime_digest"] = runtime_digest
+          for role in ("webhook", "worker"):
+              control_plane["services"][role]["deployed_image"] = (
+                  final_state[role]["runtime_image"]
+              )
+          with open("fraeno-control-plane-release.json", "w") as destination:
+              json.dump(manifest, destination, indent=2, sort_keys=True)
+              destination.write("\n")
+          PY
           sha256sum fraeno-control-plane-release.json \
             > fraeno-control-plane-release.json.sha256
           release_complete=1
@@ -962,6 +1096,7 @@ jobs:
           name: fraeno-control-plane-v${{ inputs.version }}-evidence
           path: |
             control-plane-buildkit-metadata.json
+            control-plane-image-index.json
             final-state.json
             fraeno-control-plane-release.json
             fraeno-control-plane-release.json.sha256
