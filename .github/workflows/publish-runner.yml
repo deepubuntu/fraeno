@@ -55,6 +55,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
       - name: Validate release identity
         run: |
           python -m fraeno.release_safety validate-inputs \
@@ -73,12 +79,6 @@ jobs:
                   f"release {sys.argv[1]} does not match package {project['version']}"
               )
           PY
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.10"
-          cache: pip
 
       - name: Test the exact release commit
         run: |
