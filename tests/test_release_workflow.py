@@ -240,7 +240,9 @@ def test_github_release_can_run_only_after_production_evidence() -> None:
     )
     assert artifact_step < publish_job
     assert artifact_step < tag_step < cleanup_step < publish_job
-    assert "if: failure() && steps.gcp-auth.outcome == 'success'" in workflow
+    assert "failure() &&" in workflow
+    assert "steps.gcp-auth.outcome == 'success' &&" in workflow
+    assert "steps.deploy.outcome != 'skipped'" in workflow
     assert (
         '--to-revisions "$PREVIOUS_WEBHOOK_REVISION=100"'
         in workflow[cleanup_step:publish_job]

@@ -331,16 +331,32 @@ jobs:
           image="$registry/$GCP_PROJECT_ID/$GCP_REPOSITORY/control-plane"
           echo "REGISTRY=$registry" >> "$GITHUB_ENV"
           echo "CONTROL_PLANE_IMAGE=$image" >> "$GITHUB_ENV"
+          describe_optional_digest() {
+            local reference="$1"
+            local error_file="$2"
+            local digest
+            if digest="$(
+              gcloud artifacts docker images describe "$reference" \
+                --project "$GCP_PROJECT_ID" \
+                --format "value(image_summary.digest)" 2>"$error_file"
+            )"
+            then
+              printf "%s" "$digest"
+              return
+            fi
+            if grep --quiet "NOT_FOUND" "$error_file"; then
+              return
+            fi
+            cat "$error_file" >&2
+            return 1
+          }
           semantic_digest="$(
-            gcloud artifacts docker images describe \
-              "$image:v$RELEASE_VERSION" \
-              --project "$GCP_PROJECT_ID" \
-              --format "value(image_summary.digest)" 2>/dev/null || true
+            describe_optional_digest \
+              "$image:v$RELEASE_VERSION" semantic-tag-error.txt
           )"
           commit_digest="$(
-            gcloud artifacts docker images describe "$image:$RELEASE_SHA" \
-              --project "$GCP_PROJECT_ID" \
-              --format "value(image_summary.digest)" 2>/dev/null || true
+            describe_optional_digest \
+              "$image:$RELEASE_SHA" commit-tag-error.txt
           )"
           if [[ -z "$semantic_digest" && -z "$commit_digest" ]]; then
             if [[ "$RESUME_RUN_ID" != "none" ]]; then
@@ -401,12 +417,13 @@ jobs:
               python - \
                 "$RELEASE_VERSION" \
                 "$RELEASE_SHA" \
-                "$image" <<'PY'
+                "$image" \
+                "$RESUME_RUN_ID" <<'PY'
           import json
           import re
           import sys
 
-          version, commit, image = sys.argv[1:]
+          version, commit, image, run_id = sys.argv[1:]
           payload = json.load(
               open(
                   "resume-control-plane-evidence/"
@@ -420,11 +437,28 @@ jobs:
           control = payload.get("control_plane", {})
           if control.get("image") != image:
               raise SystemExit("Resume evidence image does not match.")
+          if control.get("semantic_tag") != f"{image}:v{version}":
+              raise SystemExit("Resume evidence semantic tag does not match.")
+          if control.get("commit_tag") != f"{image}:{commit}":
+              raise SystemExit("Resume evidence commit tag does not match.")
           digest = control.get("digest", "")
           if re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None:
               raise SystemExit("Resume evidence has no valid digest.")
           if payload.get("rollback", {}).get("candidate_restored") is not True:
               raise SystemExit("Resume evidence did not restore the candidate.")
+          expected_url = (
+              "https://github.com/deepubuntu/fraeno/actions/runs/" + run_id
+          )
+          if payload["release"].get("run_url") != expected_url:
+              raise SystemExit("Resume evidence run URL does not match.")
+          required_checks = {
+              "Fraeno / robot integration",
+              "container",
+              "ros-integration",
+              "test",
+          }
+          if not required_checks.issubset(payload.get("release_gate", {})):
+              raise SystemExit("Resume evidence is missing release checks.")
           print(digest)
           PY
             )"
@@ -867,7 +901,12 @@ jobs:
           test "$semantic_digest" = "$CONTROL_PLANE_DIGEST"
 
       - name: Restore previous production after a failed release
-        if: failure() && steps.gcp-auth.outcome == 'success'
+        if: >-
+          ${{
+            failure() &&
+            steps.gcp-auth.outcome == 'success' &&
+            steps.deploy.outcome != 'skipped'
+          }}
         run: |
           set +e
           cleanup_status=0
