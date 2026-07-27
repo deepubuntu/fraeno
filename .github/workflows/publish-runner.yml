@@ -97,7 +97,8 @@ jobs:
             --tag fraeno-runner:release-candidate \
             .
           bash tests/container/test-external-runner.sh \
-            fraeno-runner:release-candidate
+            fraeno-runner:release-candidate \
+            "$RELEASE_VERSION"
 
       - name: Require every release check
         env:
@@ -256,7 +257,19 @@ jobs:
           gcloud artifacts docker images describe "$rollback_reference" \
             --project "$GCP_PROJECT_ID" >/dev/null
           docker pull "$rollback_reference"
-          bash tests/container/test-external-runner.sh "$rollback_reference"
+          rollback_version="$(
+            docker image inspect \
+              --format '{{index .Config.Labels "org.opencontainers.image.version"}}' \
+              "$rollback_reference"
+          )"
+          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$rollback_version" =~ $semver ]]; then
+            echo "Protected rollback image has no semantic version label." >&2
+            exit 2
+          fi
+          bash tests/container/test-external-runner.sh \
+            "$rollback_reference" \
+            "$rollback_version"
 
       - name: Set up Buildx for attestations
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0

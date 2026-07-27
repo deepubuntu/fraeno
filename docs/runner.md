@@ -97,7 +97,14 @@ fixture and hostile candidate:
 
 ```bash
 docker build --file runner/Dockerfile --tag fraeno-runner:test .
-bash tests/container/test-external-runner.sh fraeno-runner:test
+runner_version="$(
+  docker image inspect \
+    --format '{{index .Config.Labels "org.opencontainers.image.version"}}' \
+    fraeno-runner:test
+)"
+bash tests/container/test-external-runner.sh \
+  fraeno-runner:test \
+  "$runner_version"
 ```
 
 The first candidate passes. The second candidate builds but breaks the robot
