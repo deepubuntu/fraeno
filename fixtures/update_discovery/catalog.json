@@ -1,0 +1,81 @@
+{
+  "records": [
+    {
+      "provider": "pypi",
+      "name": "requests",
+      "current": "2.31.0",
+      "target": "2.32.5",
+      "source": "https://pypi.org/project/requests/2.32.5/",
+      "release_date": "2025-08-18T20:46:00Z",
+      "evidence": "The fixture PyPI index marks 2.32.5 as the latest stable release.",
+      "metadata": {
+        "index": "fixture-pypi"
+      }
+    },
+    {
+      "provider": "docker",
+      "name": "ros",
+      "current": "humble-ros-base-jammy",
+      "target": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "source": "https://hub.docker.com/_/ros/tags",
+      "release_date": "2026-07-20T10:30:00Z",
+      "evidence": "The fixture registry resolves the ROS tag to this amd64 digest.",
+      "metadata": {
+        "architecture": "amd64",
+        "registry": "fixture-docker"
+      },
+      "target_platform": {
+        "architecture": "amd64"
+      }
+    },
+    {
+      "provider": "apt",
+      "name": "curl",
+      "current": "7.81.0-1ubuntu1.15",
+      "target": "7.81.0-1ubuntu1.21",
+      "source": "https://launchpad.net/ubuntu/jammy/amd64/curl/7.81.0-1ubuntu1.21",
+      "release_date": "2026-06-17T14:20:00Z",
+      "evidence": "The fixture package index marks this as the newest jammy amd64 build.",
+      "metadata": {
+        "architecture": "amd64",
+        "series": "jammy"
+      },
+      "target_platform": {
+        "operating_system": "ubuntu",
+        "operating_system_version": "22.04",
+        "architecture": "amd64"
+      }
+    },
+    {
+      "provider": "vcstool",
+      "name": "navigation",
+      "current": "1111111111111111111111111111111111111111",
+      "target": "3333333333333333333333333333333333333333",
+      "source": "https://github.com/ros-navigation/navigation2/commit/3333333333333333333333333333333333333333",
+      "release_date": "2026-07-19T08:15:00Z",
+      "evidence": "The fixture Git graph proves the target descends from the current SHA.",
+      "metadata": {
+        "repository": "ros-navigation/navigation2"
+      }
+    },
+    {
+      "provider": "rosdep",
+      "name": "rclcpp",
+      "current": "ros-humble-rclcpp=16.0.14-1jammy.20260501.120000",
+      "target": "ros-humble-rclcpp=16.0.15-1jammy.20260710.180000",
+      "source": "https://repo.ros2.org/status_page/ros_humble_default.html",
+      "release_date": "2026-07-10T18:00:00Z",
+      "evidence": "The fixture rosdep resolution and ROS package index agree on the target.",
+      "metadata": {
+        "apt_package": "ros-humble-rclcpp",
+        "ros_distribution": "humble"
+      },
+      "target_platform": {
+        "ros_distribution": "humble",
+        "operating_system": "ubuntu",
+        "operating_system_version": "22.04",
+        "architecture": "amd64"
+      }
+    }
+  ]
+}

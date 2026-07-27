@@ -1,0 +1,5 @@
+repositories:
+  navigation:
+    type: git
+    url: https://github.com/ros-navigation/navigation2.git
+    version: 1111111111111111111111111111111111111111
