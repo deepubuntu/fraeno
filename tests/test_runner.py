@@ -72,3 +72,33 @@ def test_validation_isolates_baseline_and_candidate_ros_domains(
     candidate_domain_id = result.candidate.observation.metadata["domain_id"]
     assert candidate_domain_id == baseline_domain_id + 1
     assert 1 <= baseline_domain_id <= 99
+
+
+def test_candidate_observation_failure_is_infrastructure_error(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline"
+    candidate = tmp_path / "candidate"
+    baseline.mkdir()
+    candidate.mkdir()
+    script = (
+        "import json, os, sys; "
+        "candidate = os.environ['FRAENO_PHASE'] == 'candidate'; "
+        "sys.exit(8) if candidate else print(json.dumps("
+        "{'schema_version': 1, 'healthy': True, 'graph_stable': True, "
+        "'graph': {'nodes': [], 'topics': [], 'services': [], 'actions': []}, "
+        "'transforms': [], 'diagnostics': {}}))"
+    )
+    config = FraenoConfig(
+        version=1,
+        project_name="observation-failure",
+        validation=ValidationConfig(
+            steps=(),
+            observation_command=(sys.executable, "-c", script),
+        ),
+    )
+
+    result = run_validation(baseline, candidate, config)
+
+    assert result.outcome is Outcome.ERROR
+    assert result.candidate.error == "Observation command failed."

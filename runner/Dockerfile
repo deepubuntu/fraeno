@@ -24,7 +24,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends python3-pip \
+    && apt-get install --yes --no-install-recommends \
+        python3-pip \
+        ros-humble-diagnostic-msgs \
+        ros-humble-tf2-msgs \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 65532 fraeno-sandbox \
     && useradd \

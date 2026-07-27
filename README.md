@@ -82,6 +82,47 @@ fraeno validate \
 
 The contract must come from the trusted base commit. A candidate cannot weaken its own required checks.
 
+## Generic ROS 2 observation
+
+`fraeno observe-ros2` launches the system command in `.fraeno.yml`, waits for
+the ROS graph to settle, measures configured topics more than once, and stops
+the complete process group. It discovers nodes, topics, endpoint QoS, services,
+actions, transforms, diagnostics, and process health without a custom observer
+script.
+
+The observer timing and evidence sources are explicit:
+
+```yaml
+validation:
+  observe:
+    command:
+      - bash
+      - -lc
+      - >-
+        source install/setup.bash &&
+        fraeno observe-ros2 --config "$FRAENO_TRUSTED_ROOT/.fraeno.yml"
+    ros2:
+      launch_command: [ros2, launch, my_robot_bringup, system.launch.py]
+      warmup_seconds: 2
+      graph_stabilization_timeout_seconds: 15
+      graph_stabilization_interval_seconds: 0.25
+      graph_stabilization_samples: 3
+      sample_seconds: 5
+      measurement_repetitions: 3
+      rate_topics: [/sensor/reading, /robot/command]
+      diagnostics_topics: [/diagnostics]
+      transform_topics: [/tf, /tf_static]
+      shutdown_timeout_seconds: 5
+```
+
+Use `kind:name` entries such as `topic:/temporary/debug` in
+`allowed_missing_baseline_entities` when a known baseline entity may disappear.
+Allowed removals never override a required contract entity.
+
+Fraeno treats missing or unreadable observer evidence as an infrastructure
+error. Confirmed graph, health, QoS, rate, diagnostic, or process regressions
+block the candidate.
+
 ## External repository runner
 
 An external repository needs only a project contract and the thin files under

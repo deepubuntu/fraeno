@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import signal
 import subprocess
 import sys
 import time
+from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -107,6 +109,13 @@ class ValidationRun:
         if not self.baseline.succeeded:
             return Outcome.ERROR
         if not self.candidate.succeeded:
+            if self.candidate.error in {
+                "Observation command failed.",
+            } or (
+                self.candidate.error is not None
+                and self.candidate.error.startswith("Invalid observation:")
+            ):
+                return Outcome.ERROR
             return Outcome.BLOCK
         if self.comparison is None:
             return Outcome.ERROR
@@ -285,33 +294,38 @@ def _run_command(
             identity["extra_groups"] = ()
         if command_gid is not None:
             identity["group"] = command_gid
-        completed = subprocess.run(
+        process = subprocess.Popen(
             command,
             cwd=workspace,
             env=environment,
-            check=False,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout_seconds,
             start_new_session=True,
             **identity,
         )
+        try:
+            stdout, stderr = process.communicate(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            with suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGKILL)
+            stdout, stderr = process.communicate()
+            return StepResult(
+                name=name,
+                command=command,
+                exit_code=124,
+                duration_seconds=round(time.monotonic() - started, 3),
+                stdout=stdout,
+                stderr=stderr + f"\nTimed out after {timeout_seconds} seconds.",
+            )
+        assert process.returncode is not None
         return StepResult(
             name=name,
             command=command,
-            exit_code=completed.returncode,
+            exit_code=process.returncode,
             duration_seconds=round(time.monotonic() - started, 3),
-            stdout=completed.stdout,
-            stderr=completed.stderr,
-        )
-    except subprocess.TimeoutExpired as error:
-        return StepResult(
-            name=name,
-            command=command,
-            exit_code=124,
-            duration_seconds=round(time.monotonic() - started, 3),
-            stdout=_decoded(error.stdout),
-            stderr=_decoded(error.stderr) + f"\nTimed out after {timeout_seconds} seconds.",
+            stdout=stdout,
+            stderr=stderr,
         )
     except OSError as error:
         return StepResult(
@@ -322,12 +336,6 @@ def _run_command(
             stdout="",
             stderr=str(error),
         )
-
-
-def _decoded(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    return value.decode(errors="replace") if isinstance(value, bytes) else value
 
 
 def _not_run(workspace: Path, phase: str, error: str) -> WorkspaceRun:

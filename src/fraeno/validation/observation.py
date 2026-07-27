@@ -81,6 +81,28 @@ class TopicObservation:
 
 
 @dataclass(frozen=True)
+class ProcessObservation:
+    command: tuple[str, ...]
+    running: bool
+    exit_code: int | None = None
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> ProcessObservation:
+        command = raw.get("command", [])
+        if not isinstance(command, list) or not all(
+            isinstance(part, str) for part in command
+        ):
+            raise ObservationError("process.command must be a list of strings")
+        return cls(
+            command=tuple(command),
+            running=bool(raw.get("running", False)),
+            exit_code=(
+                int(raw["exit_code"]) if raw.get("exit_code") is not None else None
+            ),
+        )
+
+
+@dataclass(frozen=True)
 class SystemObservation:
     healthy: bool
     graph_stable: bool
@@ -90,6 +112,8 @@ class SystemObservation:
     actions: dict[str, tuple[str, ...]]
     transforms: frozenset[str]
     diagnostics: dict[str, int]
+    processes: tuple[ProcessObservation, ...] = ()
+    infrastructure_errors: tuple[str, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -109,6 +133,22 @@ class SystemObservation:
             if topic.name
         }
 
+        process_values = raw.get("processes", [])
+        if not isinstance(process_values, list) or not all(
+            isinstance(item, dict) for item in process_values
+        ):
+            raise ObservationError("processes must be a list of objects")
+        evidence = raw.get("evidence", {})
+        if not isinstance(evidence, dict):
+            raise ObservationError("evidence must be an object")
+        evidence_errors = evidence.get("errors", [])
+        if not isinstance(evidence_errors, list) or not all(
+            isinstance(item, str) and item for item in evidence_errors
+        ):
+            raise ObservationError("evidence.errors must be a list of strings")
+        if evidence.get("complete") is False and not evidence_errors:
+            evidence_errors = ["Observer marked infrastructure evidence incomplete."]
+
         return cls(
             healthy=bool(raw.get("healthy", False)),
             graph_stable=bool(raw.get("graph_stable", False)),
@@ -121,6 +161,10 @@ class SystemObservation:
                 str(name): int(level)
                 for name, level in _dictionary(raw.get("diagnostics", {})).items()
             },
+            processes=tuple(
+                ProcessObservation.from_dict(item) for item in process_values
+            ),
+            infrastructure_errors=tuple(evidence_errors),
             metadata=_dictionary(raw.get("metadata", {})),
         )
 
@@ -159,6 +203,18 @@ class SystemObservation:
             },
             "transforms": sorted(self.transforms),
             "diagnostics": dict(sorted(self.diagnostics.items())),
+            "processes": [
+                {
+                    "command": list(process.command),
+                    "running": process.running,
+                    "exit_code": process.exit_code,
+                }
+                for process in self.processes
+            ],
+            "evidence": {
+                "complete": not self.infrastructure_errors,
+                "errors": list(self.infrastructure_errors),
+            },
             "metadata": self.metadata,
         }
 

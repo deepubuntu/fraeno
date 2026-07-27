@@ -45,7 +45,8 @@ def compare_systems(
     candidate: SystemObservation,
     config: ValidationConfig,
 ) -> ComparisonReport:
-    baseline_errors = _contract_findings(baseline, config)
+    baseline_errors = _infrastructure_findings(baseline, "baseline")
+    baseline_errors.extend(_contract_findings(baseline, config))
     if not baseline.graph_stable:
         baseline_errors.append(
             Finding("baseline-unstable-graph", "The baseline ROS graph did not stabilize.")
@@ -62,18 +63,31 @@ def compare_systems(
             candidate_summary=_summary(candidate),
         )
 
-    findings: list[Finding] = []
+    candidate_errors = _infrastructure_findings(candidate, "candidate")
     if not candidate.graph_stable:
-        findings.append(
-            Finding("candidate-unstable-graph", "The candidate ROS graph did not stabilize.")
+        candidate_errors.append(
+            Finding(
+                "candidate-unstable-graph",
+                "The candidate ROS graph did not stabilize.",
+            )
         )
+    if candidate_errors:
+        return ComparisonReport(
+            outcome=Outcome.ERROR,
+            findings=tuple(candidate_errors),
+            baseline_summary=_summary(baseline),
+            candidate_summary=_summary(candidate),
+        )
+
+    findings: list[Finding] = []
     if not candidate.healthy:
         findings.append(
             Finding("candidate-unhealthy", "The candidate system reported unhealthy.")
         )
+    findings.extend(_process_findings(candidate))
     findings.extend(_contract_findings(candidate, config))
-    findings.extend(_compare_required_topics(baseline, candidate, config))
-    findings.extend(_compare_diagnostics(baseline, candidate))
+    findings.extend(_compare_graph(baseline, candidate, config))
+    findings.extend(_compare_diagnostics(baseline, candidate, config))
 
     return ComparisonReport(
         outcome=Outcome.BLOCK if findings else Outcome.PASS,
@@ -124,6 +138,20 @@ def _contract_findings(
     findings.extend(
         _missing_findings("action", config.required_actions, observation.actions)
     )
+    findings.extend(
+        _missing_findings(
+            "transform",
+            config.required_transforms,
+            observation.transforms,
+        )
+    )
+    findings.extend(
+        _missing_findings(
+            "diagnostic",
+            config.required_diagnostics,
+            observation.diagnostics,
+        )
+    )
     for topic, minimum_rate in config.minimum_topic_rates_hz.items():
         candidate = observation.topics.get(topic)
         if candidate is None:
@@ -147,6 +175,36 @@ def _contract_findings(
     return findings
 
 
+def _infrastructure_findings(
+    observation: SystemObservation,
+    phase: str,
+) -> list[Finding]:
+    return [
+        Finding(
+            f"{phase}-infrastructure-error",
+            error,
+        )
+        for error in observation.infrastructure_errors
+    ]
+
+
+def _process_findings(observation: SystemObservation) -> list[Finding]:
+    return [
+        Finding(
+            "process-exited",
+            (
+                "Configured system process exited before observation completed"
+                if process.exit_code is None
+                else "Configured system process exited before observation completed "
+                f"with code {process.exit_code}"
+            ),
+            " ".join(process.command),
+        )
+        for process in observation.processes
+        if not process.running
+    ]
+
+
 def _missing_findings(
     entity_type: str, required: set[str] | frozenset[str], observed: Any
 ) -> list[Finding]:
@@ -161,16 +219,37 @@ def _missing_findings(
     ]
 
 
-def _compare_required_topics(
+def _compare_graph(
     baseline: SystemObservation,
     candidate: SystemObservation,
     config: ValidationConfig,
 ) -> list[Finding]:
     findings: list[Finding] = []
-    for name in sorted(config.required_topics):
+    findings.extend(
+        _removed_findings("node", baseline.nodes, candidate.nodes, config)
+    )
+    findings.extend(
+        _removed_findings("topic", baseline.topics, candidate.topics, config)
+    )
+    findings.extend(
+        _removed_findings("service", baseline.services, candidate.services, config)
+    )
+    findings.extend(
+        _removed_findings("action", baseline.actions, candidate.actions, config)
+    )
+    findings.extend(
+        _removed_findings(
+            "transform",
+            baseline.transforms,
+            candidate.transforms,
+            config,
+        )
+    )
+
+    for name in sorted(baseline.topics.keys() & candidate.topics.keys()):
         before = baseline.topics.get(name)
         after = candidate.topics.get(name)
-        if before is None or after is None:
+        if before is None or after is None:  # pragma: no cover - guarded by keys
             continue
         if before.types != after.types:
             findings.append(
@@ -207,7 +286,58 @@ def _compare_required_topics(
                 )
             )
         _compare_topic_rate(name, before, after, config, findings)
+
+    findings.extend(
+        _typed_entity_changes("service", baseline.services, candidate.services)
+    )
+    findings.extend(
+        _typed_entity_changes("action", baseline.actions, candidate.actions)
+    )
     return findings
+
+
+def _removed_findings(
+    entity_type: str,
+    baseline: Any,
+    candidate: Any,
+    config: ValidationConfig,
+) -> list[Finding]:
+    missing = set(baseline) - set(candidate)
+    return [
+        Finding(
+            f"{entity_type}-removed",
+            f"A baseline {entity_type} is missing from the candidate.",
+            name,
+        )
+        for name in sorted(missing)
+        if not _missing_allowed(config, entity_type, name)
+    ]
+
+
+def _typed_entity_changes(
+    entity_type: str,
+    baseline: dict[str, tuple[str, ...]],
+    candidate: dict[str, tuple[str, ...]],
+) -> list[Finding]:
+    return [
+        Finding(
+            f"{entity_type}-type-changed",
+            f"{entity_type.title()} types changed from {baseline[name]!r} "
+            f"to {candidate[name]!r}.",
+            name,
+        )
+        for name in sorted(baseline.keys() & candidate.keys())
+        if baseline[name] != candidate[name]
+    ]
+
+
+def _missing_allowed(
+    config: ValidationConfig,
+    entity_type: str,
+    name: str,
+) -> bool:
+    allowed = config.allowed_missing_baseline_entities
+    return name in allowed or f"{entity_type}:{name}" in allowed
 
 
 def _has_compatible_path(topic: TopicObservation) -> bool:
@@ -245,19 +375,22 @@ def _compare_topic_rate(
 
 
 def _compare_diagnostics(
-    baseline: SystemObservation, candidate: SystemObservation
+    baseline: SystemObservation,
+    candidate: SystemObservation,
+    config: ValidationConfig,
 ) -> list[Finding]:
     findings: list[Finding] = []
     for component, before_level in baseline.diagnostics.items():
         after_level = candidate.diagnostics.get(component)
         if after_level is None:
-            findings.append(
-                Finding(
-                    "diagnostic-missing",
-                    "A baseline diagnostic component is missing.",
-                    component,
+            if not _missing_allowed(config, "diagnostic", component):
+                findings.append(
+                    Finding(
+                        "diagnostic-missing",
+                        "A baseline diagnostic component is missing.",
+                        component,
+                    )
                 )
-            )
         elif after_level > before_level:
             findings.append(
                 Finding(
