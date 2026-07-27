@@ -328,36 +328,97 @@ jobs:
           fi
           echo "RUNNER_DIGEST=$runner_semantic_digest" >> "$GITHUB_ENV"
           registry="${GCP_LOCATION}-docker.pkg.dev"
+          repository="$registry/$GCP_PROJECT_ID/$GCP_REPOSITORY"
           image="$registry/$GCP_PROJECT_ID/$GCP_REPOSITORY/control-plane"
+          tag_root="$(
+            printf "projects/%s/locations/%s/repositories/%s/packages/%s/tags" \
+              "$GCP_PROJECT_ID" \
+              "$GCP_LOCATION" \
+              "$GCP_REPOSITORY" \
+              "control-plane"
+          )"
           echo "REGISTRY=$registry" >> "$GITHUB_ENV"
           echo "CONTROL_PLANE_IMAGE=$image" >> "$GITHUB_ENV"
-          describe_optional_digest() {
-            local reference="$1"
-            local error_file="$2"
-            local digest
-            if digest="$(
-              gcloud artifacts docker images describe "$reference" \
-                --project "$GCP_PROJECT_ID" \
-                --format "value(image_summary.digest)" 2>"$error_file"
-            )"
-            then
-              printf "%s" "$digest"
-              return
-            fi
-            if grep --quiet "NOT_FOUND" "$error_file"; then
-              return
-            fi
-            cat "$error_file" >&2
-            return 1
-          }
-          semantic_digest="$(
-            describe_optional_digest \
-              "$image:v$RELEASE_VERSION" semantic-tag-error.txt
-          )"
-          commit_digest="$(
-            describe_optional_digest \
-              "$image:$RELEASE_SHA" commit-tag-error.txt
-          )"
+          gcloud artifacts docker tags list "$repository" \
+            --project "$GCP_PROJECT_ID" \
+            --format json > control-plane-tags.json
+          # REGISTRY_TAG_RESOLVER_START
+          cat > "$RUNNER_TEMP/resolve-control-plane-tags.py" <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          (
+              image,
+              tag_root,
+              semantic_tag,
+              commit_tag,
+              inventory_path,
+              *output_paths,
+          ) = sys.argv[1:]
+          payload = json.loads(Path(inventory_path).read_text())
+          if not isinstance(payload, list):
+              raise SystemExit("Artifact Registry inventory must be a JSON list.")
+
+          targets = (semantic_tag, commit_tag)
+          expected_tags = {f"{tag_root}/{tag}": tag for tag in targets}
+          version_root = tag_root.removesuffix("/tags") + "/versions/"
+          matches = {tag: set() for tag in targets}
+          digest_pattern = re.compile(r"sha256:[0-9a-f]{64}")
+          for item in payload:
+              if not isinstance(item, dict):
+                  raise SystemExit("Artifact Registry inventory contains a non-object.")
+              tag_resource = item.get("tag")
+              image_resource = item.get("image")
+              version = item.get("version")
+              if not all(
+                  isinstance(field, str)
+                  for field in (tag_resource, image_resource, version)
+              ):
+                  raise SystemExit(
+                      "Artifact Registry inventory must contain string "
+                      "tag, image, and version fields."
+                  )
+              if tag_resource not in expected_tags:
+                  continue
+              tag = expected_tags[tag_resource]
+              if image_resource != image:
+                  raise SystemExit(
+                      f"Artifact Registry returned another image for {tag}."
+                  )
+              if not version.startswith(version_root):
+                  raise SystemExit(
+                      f"Artifact Registry returned an invalid version for {tag}."
+                  )
+              digest = version.removeprefix(version_root)
+              if digest_pattern.fullmatch(digest) is None:
+                  raise SystemExit(
+                      f"Artifact Registry returned an invalid digest for {tag}."
+                  )
+              matches[tag].add(digest)
+
+          for tag, output_path in zip(targets, output_paths, strict=True):
+              digests = matches[tag]
+              if len(digests) > 1:
+                  raise SystemExit(
+                      f"Artifact Registry returned more than one digest for {tag}."
+                  )
+              Path(output_path).write_text(
+                  (next(iter(digests)) if digests else "") + "\n"
+              )
+          PY
+          # REGISTRY_TAG_RESOLVER_END
+          python "$RUNNER_TEMP/resolve-control-plane-tags.py" \
+            "$image" \
+            "$tag_root" \
+            "v$RELEASE_VERSION" \
+            "$RELEASE_SHA" \
+            control-plane-tags.json \
+            semantic-tag-digest.txt \
+            commit-tag-digest.txt
+          semantic_digest="$(<semantic-tag-digest.txt)"
+          commit_digest="$(<commit-tag-digest.txt)"
           if [[ -z "$semantic_digest" && -z "$commit_digest" ]]; then
             if [[ "$RESUME_RUN_ID" != "none" ]]; then
               echo "resume_run_id is allowed only when a release tag exists." >&2
@@ -870,43 +931,63 @@ jobs:
       - name: Finalize immutable release tags
         run: |
           image_reference="$CONTROL_PLANE_IMAGE@$CONTROL_PLANE_DIGEST"
-          ensure_tag() {
+          repository="$(
+            printf "%s/%s/%s" \
+              "${GCP_LOCATION}-docker.pkg.dev" \
+              "$GCP_PROJECT_ID" \
+              "$GCP_REPOSITORY"
+          )"
+          tag_root="$(
+            printf "projects/%s/locations/%s/repositories/%s/packages/%s/tags" \
+              "$GCP_PROJECT_ID" \
+              "$GCP_LOCATION" \
+              "$GCP_REPOSITORY" \
+              "control-plane"
+          )"
+          refresh_tag_digests() {
+            gcloud artifacts docker tags list "$repository" \
+              --project "$GCP_PROJECT_ID" \
+              --format json > "$RUNNER_TEMP/control-plane-tags.json"
+            python "$RUNNER_TEMP/resolve-control-plane-tags.py" \
+              "$CONTROL_PLANE_IMAGE" \
+              "$tag_root" \
+              "v$RELEASE_VERSION" \
+              "$RELEASE_SHA" \
+              "$RUNNER_TEMP/control-plane-tags.json" \
+              "$RUNNER_TEMP/semantic-tag-digest.txt" \
+              "$RUNNER_TEMP/commit-tag-digest.txt"
+            semantic_digest="$(<"$RUNNER_TEMP/semantic-tag-digest.txt")"
+            commit_digest="$(<"$RUNNER_TEMP/commit-tag-digest.txt")"
+          }
+          require_tag_available() {
             local tag="$1"
-            local existing_digest
-            existing_digest="$(
-              gcloud artifacts docker images describe \
-                "$CONTROL_PLANE_IMAGE:$tag" \
-                --project "$GCP_PROJECT_ID" \
-                --format "value(image_summary.digest)" 2>/dev/null || true
-            )"
+            local existing_digest="$2"
             if [[ -n "$existing_digest" ]]; then
               if [[ "$existing_digest" != "$CONTROL_PLANE_DIGEST" ]]; then
                 echo "Existing immutable tag $tag has another digest." >&2
                 exit 2
               fi
+            fi
+          }
+          add_tag_if_absent() {
+            local tag="$1"
+            local existing_digest="$2"
+            if [[ -n "$existing_digest" ]]; then
               return
             fi
             gcloud artifacts docker tags add \
               "$image_reference" \
               "$CONTROL_PLANE_IMAGE:$tag" \
               --project "$GCP_PROJECT_ID" \
-              --quiet
+                --quiet
           }
 
-          ensure_tag "$RELEASE_SHA"
-          ensure_tag "v$RELEASE_VERSION"
-          commit_digest="$(
-            gcloud artifacts docker images describe \
-              "$CONTROL_PLANE_IMAGE:$RELEASE_SHA" \
-              --project "$GCP_PROJECT_ID" \
-              --format "value(image_summary.digest)"
-          )"
-          semantic_digest="$(
-            gcloud artifacts docker images describe \
-              "$CONTROL_PLANE_IMAGE:v$RELEASE_VERSION" \
-              --project "$GCP_PROJECT_ID" \
-              --format "value(image_summary.digest)"
-          )"
+          refresh_tag_digests
+          require_tag_available "$RELEASE_SHA" "$commit_digest"
+          require_tag_available "v$RELEASE_VERSION" "$semantic_digest"
+          add_tag_if_absent "$RELEASE_SHA" "$commit_digest"
+          add_tag_if_absent "v$RELEASE_VERSION" "$semantic_digest"
+          refresh_tag_digests
           test "$commit_digest" = "$CONTROL_PLANE_DIGEST"
           test "$semantic_digest" = "$CONTROL_PLANE_DIGEST"
 

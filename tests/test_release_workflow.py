@@ -1,13 +1,75 @@
 from __future__ import annotations
 
+import json
 import re
+import subprocess
+import sys
+import textwrap
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).parents[1]
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "publish-runner.yml"
 CONTROL_RELEASE_WORKFLOW = (
     ROOT / ".github" / "workflows" / "release-control-plane.yml"
 )
+CONTROL_IMAGE = (
+    "us-central1-docker.pkg.dev/deepubuntu-32f9e/"
+    "fraeno-control-plane/control-plane"
+)
+CONTROL_COMMIT = "a" * 40
+CONTROL_DIGEST = "sha256:" + ("b" * 64)
+SECOND_CONTROL_DIGEST = "sha256:" + ("c" * 64)
+CONTROL_PACKAGE_ROOT = (
+    "projects/deepubuntu-32f9e/locations/us-central1/repositories/"
+    "fraeno-control-plane/packages/control-plane"
+)
+CONTROL_TAG_ROOT = f"{CONTROL_PACKAGE_ROOT}/tags"
+CONTROL_VERSION_ROOT = f"{CONTROL_PACKAGE_ROOT}/versions"
+
+
+def _registry_tag_resolver_source() -> str:
+    workflow = CONTROL_RELEASE_WORKFLOW.read_text()
+    block = workflow.split("# REGISTRY_TAG_RESOLVER_START", maxsplit=1)[1].split(
+        "# REGISTRY_TAG_RESOLVER_END",
+        maxsplit=1,
+    )[0]
+    source = block.split("<<'PY'\n", maxsplit=1)[1].rsplit(
+        "\n          PY",
+        maxsplit=1,
+    )[0]
+    return textwrap.dedent(source)
+
+
+def _run_registry_tag_resolver(
+    tmp_path: Path,
+    inventory: object,
+) -> tuple[subprocess.CompletedProcess[str], str, str]:
+    inventory_path = tmp_path / "inventory.json"
+    semantic_path = tmp_path / "semantic.txt"
+    commit_path = tmp_path / "commit.txt"
+    inventory_path.write_text(json.dumps(inventory))
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            CONTROL_IMAGE,
+            CONTROL_TAG_ROOT,
+            "v0.2.0",
+            CONTROL_COMMIT,
+            str(inventory_path),
+            str(semantic_path),
+            str(commit_path),
+        ],
+        input=_registry_tag_resolver_source(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    semantic = semantic_path.read_text().strip() if semantic_path.exists() else ""
+    commit = commit_path.read_text().strip() if commit_path.exists() else ""
+    return result, semantic, commit
 
 
 def test_release_workflow_is_manual_and_minimally_privileged() -> None:
@@ -221,6 +283,167 @@ def test_control_release_requires_same_commit_runner_evidence() -> None:
     assert "resume-control-plane-evidence" in workflow
     assert "sha256sum --check fraeno-control-plane-release.json.sha256" in workflow
     assert "Existing tag does not match proven resume evidence." in workflow
+
+
+def test_control_release_lists_tags_without_parsing_error_messages() -> None:
+    workflow = CONTROL_RELEASE_WORKFLOW.read_text()
+
+    assert workflow.count("gcloud artifacts docker tags list") == 2
+    assert "--include-tags" not in workflow
+    assert "--format json > control-plane-tags.json" in workflow
+    assert "describe_optional_digest" not in workflow
+    assert 'grep --quiet "NOT_FOUND"' not in workflow
+    assert "semantic_digest=\"$(<semantic-tag-digest.txt)\"" in workflow
+    assert "commit_digest=\"$(<commit-tag-digest.txt)\"" in workflow
+    finalize = workflow[workflow.index("Finalize immutable release tags") :]
+    assert "refresh_tag_digests" in finalize
+    assert finalize.count("refresh_tag_digests") == 3
+    assert "images describe" not in finalize
+    assert "|| true" not in finalize
+    assert finalize.index(
+        'require_tag_available "$RELEASE_SHA" "$commit_digest"'
+    ) < finalize.index(
+        'add_tag_if_absent "$RELEASE_SHA" "$commit_digest"'
+    )
+    assert finalize.index(
+        'require_tag_available "v$RELEASE_VERSION" "$semantic_digest"'
+    ) < finalize.index(
+        'add_tag_if_absent "v$RELEASE_VERSION" "$semantic_digest"'
+    )
+    assert finalize.index(
+        'require_tag_available "v$RELEASE_VERSION" "$semantic_digest"'
+    ) < finalize.index(
+        'add_tag_if_absent "$RELEASE_SHA" "$commit_digest"'
+    )
+
+
+def test_registry_tag_resolver_treats_an_empty_inventory_as_a_new_release(
+    tmp_path: Path,
+) -> None:
+    result, semantic, commit = _run_registry_tag_resolver(tmp_path, [])
+
+    assert result.returncode == 0, result.stderr
+    assert semantic == ""
+    assert commit == ""
+
+
+def test_registry_tag_resolver_returns_exact_structured_digests(
+    tmp_path: Path,
+) -> None:
+    inventory = [
+        {
+            "tag": f"{CONTROL_TAG_ROOT}/v0.2.0-near-match",
+            "image": CONTROL_IMAGE,
+            "version": f"{CONTROL_VERSION_ROOT}/{SECOND_CONTROL_DIGEST}",
+        },
+        {
+            "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+            "image": CONTROL_IMAGE,
+            "version": f"{CONTROL_VERSION_ROOT}/{CONTROL_DIGEST}",
+        },
+        {
+            "tag": f"{CONTROL_TAG_ROOT}/{CONTROL_COMMIT}",
+            "image": CONTROL_IMAGE,
+            "version": f"{CONTROL_VERSION_ROOT}/{CONTROL_DIGEST}",
+        },
+    ]
+
+    result, semantic, commit = _run_registry_tag_resolver(tmp_path, inventory)
+
+    assert result.returncode == 0, result.stderr
+    assert semantic == CONTROL_DIGEST
+    assert commit == CONTROL_DIGEST
+
+
+@pytest.mark.parametrize("field", ["tag", "image", "version"])
+@pytest.mark.parametrize("value", ["missing", None, 17])
+def test_registry_tag_resolver_rejects_missing_or_non_string_fields(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    item: dict[str, object] = {
+        "tag": f"{CONTROL_TAG_ROOT}/unrelated",
+        "image": CONTROL_IMAGE,
+        "version": f"{CONTROL_VERSION_ROOT}/{CONTROL_DIGEST}",
+    }
+    if value == "missing":
+        item.pop(field)
+    else:
+        item[field] = value
+
+    result, _, _ = _run_registry_tag_resolver(tmp_path, [item])
+
+    assert result.returncode != 0
+    assert "must contain string tag, image, and version fields" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("inventory", "message"),
+    [
+        ({}, "inventory must be a JSON list"),
+        ([None], "inventory contains a non-object"),
+        (
+            [
+                {
+                    "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+                    "image": "us-central1-docker.pkg.dev/other/repository/image",
+                    "version": f"{CONTROL_VERSION_ROOT}/{CONTROL_DIGEST}",
+                }
+            ],
+            "returned another image",
+        ),
+        (
+            [
+                {
+                    "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+                    "image": CONTROL_IMAGE,
+                    "version": (
+                        "projects/other/locations/us-central1/repositories/"
+                        f"repository/packages/control-plane/versions/{CONTROL_DIGEST}"
+                    ),
+                }
+            ],
+            "returned an invalid version",
+        ),
+        (
+            [
+                {
+                    "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+                    "image": CONTROL_IMAGE,
+                    "version": f"{CONTROL_VERSION_ROOT}/not-a-digest",
+                }
+            ],
+            "returned an invalid digest",
+        ),
+        (
+            [
+                {
+                    "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+                    "image": CONTROL_IMAGE,
+                    "version": f"{CONTROL_VERSION_ROOT}/{CONTROL_DIGEST}",
+                },
+                {
+                    "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+                    "image": CONTROL_IMAGE,
+                    "version": (
+                        f"{CONTROL_VERSION_ROOT}/{SECOND_CONTROL_DIGEST}"
+                    ),
+                },
+            ],
+            "returned more than one digest",
+        ),
+    ],
+)
+def test_registry_tag_resolver_fails_closed_on_invalid_inventory(
+    tmp_path: Path,
+    inventory: object,
+    message: str,
+) -> None:
+    result, _, _ = _run_registry_tag_resolver(tmp_path, inventory)
+
+    assert result.returncode != 0
+    assert message in result.stderr
 
 
 def test_control_release_proves_rollback_and_restores_candidate() -> None:
