@@ -48,7 +48,7 @@ import json
 import sys
 
 report = json.load(open(sys.argv[1]))
-assert report["engine"] == {"name": "fraeno", "version": "0.1.0"}
+assert report["engine"] == {"name": "fraeno", "version": "0.2.0"}
 assert report["outcome"] == "pass"
 PY
 
@@ -68,7 +68,7 @@ import json
 import sys
 
 report = json.load(open(sys.argv[1]))
-assert report["engine"] == {"name": "fraeno", "version": "0.1.0"}
+assert report["engine"] == {"name": "fraeno", "version": "0.2.0"}
 assert report["outcome"] == "block"
 attempts = report["candidate"]["observation"]["metadata"][
     "protected_write_attempts_succeeded"

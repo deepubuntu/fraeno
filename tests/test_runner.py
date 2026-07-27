@@ -13,7 +13,7 @@ def test_end_to_end_safe_update() -> None:
         FIXTURE / "baseline", FIXTURE / "safe", load_config(FIXTURE / "fraeno.yml")
     )
     assert result.outcome is Outcome.PASS
-    assert result.to_dict()["engine"] == {"name": "fraeno", "version": "0.1.0"}
+    assert result.to_dict()["engine"] == {"name": "fraeno", "version": "0.2.0"}
 
 
 def test_end_to_end_breaking_update() -> None:

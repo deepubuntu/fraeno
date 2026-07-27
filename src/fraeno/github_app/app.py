@@ -88,7 +88,7 @@ def create_webhook_app(
 
     app = FastAPI(
         title="Fraeno GitHub webhook",
-        version="0.1.0",
+        version="0.2.0",
         lifespan=lifespan,
         docs_url=None,
         redoc_url=None,
@@ -210,7 +210,7 @@ def create_worker_app(
 
     app = FastAPI(
         title="Fraeno GitHub worker",
-        version="0.1.0",
+        version="0.2.0",
         lifespan=lifespan,
         docs_url=None,
         redoc_url=None,
