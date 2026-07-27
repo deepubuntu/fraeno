@@ -75,20 +75,31 @@ capture_workspace() {
 capture_workspace baseline "$baseline" "$run_root/baseline.json"
 capture_workspace candidate "$candidate" "$run_root/candidate.json"
 
-docker run \
-  --rm \
+comparison_container="$(
+  docker create \
   --read-only \
   --network none \
   --cap-drop ALL \
   --security-opt no-new-privileges \
   --pids-limit 128 \
+  --mount type=volume,dst=/report,volume-nocopy \
   --mount "type=bind,src=$run_root/baseline.json,dst=/evidence/baseline.json,readonly" \
   --mount "type=bind,src=$run_root/candidate.json,dst=/evidence/candidate.json,readonly" \
   --mount "type=bind,src=$config,dst=/config/fraeno.yml,readonly" \
-  --mount "type=bind,src=$output_parent,dst=/report" \
   "$image" \
   assemble-report \
   --baseline /evidence/baseline.json \
   --candidate /evidence/candidate.json \
   --config /config/fraeno.yml \
   --output "/report/$output_name"
+)"
+containers+=("$comparison_container")
+set +e
+docker start --attach "$comparison_container"
+comparison_status=$?
+set -e
+docker cp \
+  "$comparison_container:/report/$output_name" \
+  "$output_parent/$output_name"
+docker rm --volumes "$comparison_container" >/dev/null
+exit "$comparison_status"
