@@ -20,7 +20,7 @@ validation:
       - >-
         cd fixtures/ros2_qos_robot &&
         source install/setup.bash &&
-        python3 observe.py
+        python3 "$FRAENO_TRUSTED_ROOT/fixtures/ros2_qos_robot/observe.py"
     timeout_seconds: 45
   contract:
     required_nodes:

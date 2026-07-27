@@ -11,11 +11,19 @@ Customer code executes in the repository’s isolated GitHub Actions runner. The
 The trusted workflow:
 
 1. checks out the base commit and candidate commit separately;
-2. installs the Fraeno engine from a trusted release or base commit;
-3. loads the contract from the base commit;
-4. builds and observes both workspaces;
-5. exits successfully only when the candidate satisfies the contract and baseline invariants;
-6. uploads the complete JSON evidence report.
+2. pulls a versioned Fraeno runner pinned by its image digest;
+3. loads the contract and observer from the base commit;
+4. copies the baseline into a disposable baseline sandbox;
+5. copies the candidate into a different disposable candidate sandbox;
+6. runs customer commands as an unprivileged user in each sandbox;
+7. writes each observation after customer processes have stopped;
+8. compares read-only evidence in a third trusted container;
+9. uploads the complete JSON report.
+
+The candidate container does not receive the baseline evidence or final report
+mount. The installed validator and trusted observer are root-owned. The
+candidate workspace runs as UID and GID 65532 with no new privileges. The final
+report records the exact Fraeno engine version.
 
 ## Control plane
 

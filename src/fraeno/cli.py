@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,8 +17,10 @@ from fraeno.updates import (
     find_python_updates,
 )
 from fraeno.validation.compare import Outcome, compare_systems
+from fraeno.validation.contract import CapturedWorkspace, assemble_validation
 from fraeno.validation.observation import ObservationError, SystemObservation
-from fraeno.validation.runner import run_validation
+from fraeno.validation.runner import run_validation, run_workspace
+from fraeno.validation.sandbox import disposable_workspace, require_protected_output
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -77,6 +80,29 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument(
         "--output", "-o", type=Path, default=Path("fraeno-report.json")
     )
+
+    capture = commands.add_parser(
+        "capture-workspace",
+        help="Capture one workspace in an isolated runner container.",
+    )
+    capture.add_argument("--source", type=Path, required=True)
+    capture.add_argument("--config", type=Path, required=True)
+    capture.add_argument("--phase", choices=("baseline", "candidate"), required=True)
+    capture.add_argument("--output", "-o", type=Path, required=True)
+    capture.add_argument("--run-as-uid", type=int, default=65532)
+    capture.add_argument("--run-as-gid", type=int, default=65532)
+    capture.add_argument("--trusted-root", type=Path)
+
+    assemble = commands.add_parser(
+        "assemble-report",
+        help="Compare protected baseline and candidate evidence.",
+    )
+    assemble.add_argument("--baseline", type=Path, required=True)
+    assemble.add_argument("--candidate", type=Path, required=True)
+    assemble.add_argument("--config", type=Path, required=True)
+    assemble.add_argument(
+        "--output", "-o", type=Path, default=Path("fraeno-report.json")
+    )
     return parser
 
 
@@ -97,6 +123,10 @@ def main(argv: list[str] | None = None) -> int:
             return _compare(args)
         if args.command == "validate":
             return _validate(args)
+        if args.command == "capture-workspace":
+            return _capture_workspace(args)
+        if args.command == "assemble-report":
+            return _assemble_report(args)
     except (ConfigError, ObservationError, OSError, ValueError) as error:
         print(f"fraeno: {error}", file=sys.stderr)
         return 2
@@ -185,6 +215,47 @@ def _validate(args: argparse.Namespace) -> int:
     return _outcome_code(result.outcome)
 
 
+def _capture_workspace(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    output = args.output.resolve()
+    require_protected_output(
+        output,
+        command_uid=args.run_as_uid,
+        command_gid=args.run_as_gid,
+    )
+    with disposable_workspace(
+        args.source,
+        command_uid=args.run_as_uid,
+        command_gid=args.run_as_gid,
+    ) as workspace:
+        run = run_workspace(
+            workspace,
+            config,
+            args.phase,
+            command_uid=args.run_as_uid,
+            command_gid=args.run_as_gid,
+            trusted_workspace=args.trusted_root,
+        )
+    _write_json(
+        CapturedWorkspace(engine_version=__version__, run=run).to_dict(),
+        output,
+    )
+    os.chmod(output, 0o600)
+    return 0
+
+
+def _assemble_report(args: argparse.Namespace) -> int:
+    baseline = CapturedWorkspace.from_dict(_read_object(args.baseline))
+    candidate = CapturedWorkspace.from_dict(_read_object(args.candidate))
+    result = assemble_validation(
+        baseline,
+        candidate,
+        load_config(args.config),
+    )
+    _write_json(result.to_dict(), args.output)
+    return _outcome_code(result.outcome)
+
+
 def _observation_from_file(path: Path) -> SystemObservation:
     raw = json.loads(path.read_text())
     if not isinstance(raw, dict):
@@ -198,6 +269,17 @@ def _write_or_print(payload: dict[str, Any], destination: Path | None) -> None:
         destination.write_text(rendered)
     else:
         print(rendered, end="")
+
+
+def _write_json(payload: dict[str, Any], destination: Path) -> None:
+    destination.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def _read_object(path: Path) -> dict[str, Any]:
+    raw = json.loads(path.read_text())
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+    return raw
 
 
 def _outcome_code(outcome: Outcome) -> int:
