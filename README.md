@@ -41,6 +41,30 @@ fraeno scan . --output dependency-graph.json
 fraeno lock . --output fraeno.lock.json
 ```
 
+The lock records every manifest and declaration, the resolved or declared
+artifacts, shared logical components, dependency edges, provenance, and the
+target ROS distribution, operating system, architecture, and container stage.
+Unknown resolutions remain explicit.
+
+If the target cannot be inferred from a Docker base image, provide it:
+
+```bash
+fraeno lock . \
+  --ros-distro humble \
+  --os ubuntu \
+  --os-version 22.04 \
+  --architecture amd64
+```
+
+Explain what changed between two locks:
+
+```bash
+fraeno compare-locks \
+  --baseline baseline.lock.json \
+  --candidate candidate.lock.json \
+  --output dependency-change.json
+```
+
 Apply one supported update:
 
 ```bash

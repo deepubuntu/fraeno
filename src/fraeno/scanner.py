@@ -249,26 +249,39 @@ class RepositoryScanner:
 
     def _parse_dockerfile(self, path: Path, relative: str) -> list[Dependency]:
         text = path.read_text()
-        logical_lines = re.sub(r"\\\s*\n", " ", text).splitlines()
         dependencies: list[Dependency] = []
-        for logical_line in logical_lines:
+        stage_index = -1
+        stage_name: str | None = None
+        stage_platform: str | None = None
+        stage_image: str | None = None
+        for logical_line, source_line in self._docker_logical_lines(text):
             stripped = logical_line.strip()
             from_match = re.match(
-                r"FROM(?:\s+--platform=\S+)?\s+([^\s]+)", stripped, re.IGNORECASE
+                r"FROM(?:\s+--platform=(?P<platform>\S+))?\s+"
+                r"(?P<reference>[^\s]+)(?:\s+AS\s+(?P<stage>[^\s]+))?",
+                stripped,
+                re.IGNORECASE,
             )
             if from_match:
-                reference = from_match.group(1)
+                stage_index += 1
+                stage_name = from_match.group("stage") or f"stage-{stage_index}"
+                stage_platform = from_match.group("platform")
+                reference = from_match.group("reference")
+                stage_image = reference
                 image, resolved = self._split_image_reference(reference)
                 dependencies.append(
                     Dependency(
                         ecosystem=Ecosystem.DOCKER,
                         name=image,
-                        source=SourceLocation(
-                            relative, self._find_line(text, reference)
-                        ),
+                        source=SourceLocation(relative, source_line),
                         constraint=resolved,
                         resolved=resolved,
-                        metadata={"reference": reference},
+                        metadata={
+                            "reference": reference,
+                            "platform": stage_platform,
+                            "container_stage": stage_name,
+                            "stage_index": stage_index,
+                        },
                     )
                 )
 
@@ -288,15 +301,38 @@ class RepositoryScanner:
                     Dependency(
                         ecosystem=Ecosystem.APT,
                         name=name,
-                        source=SourceLocation(
-                            relative, self._find_line(text, token)
-                        ),
+                        source=SourceLocation(relative, source_line),
                         constraint=f"=={version}" if separator else None,
                         resolved=version or None,
-                        metadata={"manifest": "dockerfile"},
+                        metadata={
+                            "manifest": "dockerfile",
+                            "platform": stage_platform,
+                            "container_stage": stage_name,
+                            "container_image": stage_image,
+                            "stage_index": stage_index,
+                        },
                     )
                 )
         return dependencies
+
+    @staticmethod
+    def _docker_logical_lines(text: str) -> list[tuple[str, int]]:
+        statements: list[tuple[str, int]] = []
+        buffer: list[str] = []
+        start_line = 1
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            if not buffer:
+                start_line = line_number
+            stripped = line.rstrip()
+            continued = stripped.endswith("\\")
+            buffer.append(stripped.removesuffix("\\").strip())
+            if continued:
+                continue
+            statements.append((" ".join(buffer), start_line))
+            buffer = []
+        if buffer:
+            statements.append((" ".join(buffer), start_line))
+        return statements
 
     @staticmethod
     def _split_image_reference(reference: str) -> tuple[str, str | None]:

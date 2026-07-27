@@ -58,3 +58,27 @@ def test_unsupported_requirement_is_reported(tmp_path: Path) -> None:
     report = RepositoryScanner(tmp_path).scan()
     assert report.dependencies == []
     assert "unsupported requirement" in report.warnings[0]
+
+
+def test_records_docker_platform_and_named_stage(tmp_path: Path) -> None:
+    (tmp_path / "Dockerfile").write_text(
+        "FROM --platform=linux/arm64 ros:jazzy-ros-base-noble AS builder\n"
+        "RUN apt-get update && apt-get install -y libeigen3-dev=3.4.0-4\n"
+        "FROM ros:jazzy-ros-base-noble AS runtime\n"
+        "RUN apt-get install -y libopencv-dev\n"
+    )
+
+    report = RepositoryScanner(tmp_path).scan()
+
+    docker = [
+        item for item in report.dependencies if item.ecosystem is Ecosystem.DOCKER
+    ]
+    apt = [
+        item for item in report.dependencies if item.ecosystem is Ecosystem.APT
+    ]
+    assert docker[0].metadata["platform"] == "linux/arm64"
+    assert docker[0].metadata["container_stage"] == "builder"
+    assert docker[1].metadata["container_stage"] == "runtime"
+    assert apt[0].metadata["container_stage"] == "builder"
+    assert apt[0].metadata["container_image"] == "ros:jazzy-ros-base-noble"
+    assert apt[1].metadata["container_stage"] == "runtime"

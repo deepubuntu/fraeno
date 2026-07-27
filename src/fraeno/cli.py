@@ -8,7 +8,14 @@ from typing import Any
 
 from fraeno import __version__
 from fraeno.config import ConfigError, load_config
-from fraeno.lockfile import build_lockfile, write_lockfile
+from fraeno.dependency_graph import TargetPlatform, infer_target_platform
+from fraeno.lockfile import (
+    build_lockfile,
+    compare_lockfiles,
+    read_lockfile,
+    write_lockfile,
+)
+from fraeno.models import ScanReport
 from fraeno.scanner import RepositoryScanner
 from fraeno.updates import (
     apply_next_python_update,
@@ -32,10 +39,20 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("repository", nargs="?", default=".")
     scan.add_argument("--output", "-o", type=Path)
     scan.add_argument("--lock", type=Path)
+    _add_target_options(scan)
 
     lock = commands.add_parser("lock", help="Write a dependency lock snapshot.")
     lock.add_argument("repository", nargs="?", default=".")
     lock.add_argument("--output", "-o", type=Path, default=Path("fraeno.lock.json"))
+    _add_target_options(lock)
+
+    compare_locks = commands.add_parser(
+        "compare-locks",
+        help="Explain dependency changes between two Fraeno locks.",
+    )
+    compare_locks.add_argument("--baseline", type=Path, required=True)
+    compare_locks.add_argument("--candidate", type=Path, required=True)
+    compare_locks.add_argument("--output", "-o", type=Path)
 
     outdated = commands.add_parser(
         "outdated", help="Find supported dependency updates."
@@ -87,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
             return _scan(args)
         if args.command == "lock":
             return _lock(args)
+        if args.command == "compare-locks":
+            return _compare_locks(args)
         if args.command == "outdated":
             return _outdated(args)
         if args.command == "update":
@@ -109,16 +128,30 @@ def _scan(args: argparse.Namespace) -> int:
     payload = report.to_dict()
     _write_or_print(payload, args.output)
     if args.lock:
-        write_lockfile(build_lockfile(report, root), args.lock)
+        write_lockfile(
+            build_lockfile(report, root, target=_target_from_args(args, report)),
+            args.lock,
+        )
     return 0 if not report.warnings else 1
 
 
 def _lock(args: argparse.Namespace) -> int:
     root = Path(args.repository).resolve()
     report = RepositoryScanner(root).scan()
-    write_lockfile(build_lockfile(report, root), args.output)
+    write_lockfile(
+        build_lockfile(report, root, target=_target_from_args(args, report)),
+        args.output,
+    )
     print(args.output)
     return 0 if not report.warnings else 1
+
+
+def _compare_locks(args: argparse.Namespace) -> int:
+    baseline = read_lockfile(args.baseline)
+    candidate = read_lockfile(args.candidate)
+    comparison = compare_lockfiles(baseline, candidate)
+    _write_or_print(comparison, args.output)
+    return 0
 
 
 def _outdated(args: argparse.Namespace) -> int:
@@ -206,6 +239,26 @@ def _outcome_code(outcome: Outcome) -> int:
     if outcome is Outcome.BLOCK:
         return 1
     return 2
+
+
+def _add_target_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--ros-distro")
+    parser.add_argument("--os")
+    parser.add_argument("--os-version")
+    parser.add_argument("--architecture")
+
+
+def _target_from_args(
+    args: argparse.Namespace,
+    report: ScanReport,
+) -> TargetPlatform:
+    inferred = infer_target_platform(report)
+    return TargetPlatform(
+        ros_distribution=args.ros_distro or inferred.ros_distribution,
+        operating_system=args.os or inferred.operating_system,
+        operating_system_version=args.os_version or inferred.operating_system_version,
+        architecture=args.architecture or inferred.architecture,
+    )
 
 
 if __name__ == "__main__":
