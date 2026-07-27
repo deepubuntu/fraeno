@@ -1,0 +1,95 @@
+name: Release website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "tests/test_site.py"
+      - ".github/workflows/site-release.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fraeno-production-website
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: pip
+      - run: python -m pip install ".[dev]"
+      - run: pytest tests/test_site.py
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-24.04
+    environment:
+      name: production
+      url: https://fraeno.com
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the exact tested site
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          cp -R site public
+          jq -n \
+            --arg commit "$COMMIT_SHA" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            '{commit: $commit, repository: $repository}' \
+            > public/deploy.json
+          printf '/deploy.json\n  Cache-Control: no-store\n' > public/_headers
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          npx --yes wrangler@4.99.0 pages deploy public
+          --project-name fraeno
+          --branch main
+          --commit-hash "$GITHUB_SHA"
+          --commit-message "Release $GITHUB_SHA"
+
+      - name: Verify both production hosts
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          for host in fraeno.com www.fraeno.com; do
+            verified=false
+            for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              if deployed_commit="$(
+                curl \
+                  --fail \
+                  --silent \
+                  --show-error \
+                  --retry 2 \
+                  "https://${host}/deploy.json?commit=${COMMIT_SHA}" |
+                  jq --exit-status --raw-output '.commit'
+              )"; then
+                if [ "$deployed_commit" = "$COMMIT_SHA" ]; then
+                  verified=true
+                  break
+                fi
+              fi
+              sleep 5
+            done
+            if [ "$verified" != true ]; then
+              echo "The expected commit did not reach ${host}."
+              exit 1
+            fi
+            curl \
+              --fail \
+              --silent \
+              --show-error \
+              "https://${host}/" |
+              grep --fixed-strings "Fraeno automatically manages"
+          done
