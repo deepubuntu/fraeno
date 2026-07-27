@@ -6,8 +6,8 @@ Create the app under the `deepubuntu` account.
 
 - GitHub App name: `Fraeno`, if globally available
 - Homepage: the Fraeno product URL
-- Webhook URL: `https://SERVICE_URL/webhooks/github`
-- Webhook secret: a random value stored only in GitHub and the deployment secret store
+- Webhook URL: `https://WEBHOOK_SERVICE_URL/webhooks/github`
+- Webhook secret: a random value stored only in GitHub and Secret Manager
 - SSL verification: enabled
 - Installation scope during development: only `deepubuntu`
 
@@ -25,34 +25,47 @@ Subscribe to:
 
 Checks write permission also delivers rerun events for checks created by Fraeno.
 
-## Runtime settings
+## Production services
 
-The service requires:
+Fraeno deploys one container as two Cloud Run services.
+
+The public `fraeno-webhook` service only verifies GitHub signatures and enqueues
+durable work. It requires:
 
 ```text
+FRAENO_SERVICE_MODE=webhook
+FRAENO_GITHUB_WEBHOOK_SECRET
+FRAENO_GCP_PROJECT
+FRAENO_GCP_LOCATION
+FRAENO_TASK_QUEUE
+FRAENO_WORKER_URL
+FRAENO_TASK_SERVICE_ACCOUNT
+```
+
+The private `fraeno-worker` service performs GitHub API work and stores
+correlation state. It requires:
+
+```text
+FRAENO_SERVICE_MODE=worker
 FRAENO_GITHUB_APP_ID
 FRAENO_GITHUB_PRIVATE_KEY
-FRAENO_GITHUB_WEBHOOK_SECRET
-```
-
-Optional settings:
-
-```text
 FRAENO_GITHUB_WORKFLOW_FILE=fraeno-validation.yml
-FRAENO_STORE=firestore
-FRAENO_GITHUB_API_URL=https://api.github.com
 ```
 
-Never commit the PEM private key or webhook secret.
+The Cloud Tasks service account is the only invoker of the worker. The webhook
+service can enqueue tasks but cannot invoke the worker directly. Never commit
+the PEM private key or webhook secret.
 
 ## Local service
 
 ```bash
 python3 -m pip install ".[app]"
-uvicorn fraeno.github_app.app:app --host 127.0.0.1 --port 8080
+FRAENO_SERVICE_MODE=webhook \
+  uvicorn fraeno.github_app.app:app --host 127.0.0.1 --port 8080
 ```
 
-The health endpoint is `/healthz`. A configured service reports `configured: true`.
+Use `FRAENO_SERVICE_MODE=worker` to run the private worker. Both services expose
+`/healthz`; each response identifies its service role and configuration state.
 
 ## Production checks
 

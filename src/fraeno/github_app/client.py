@@ -10,7 +10,9 @@ from fraeno.github_app.settings import AppSettings
 
 
 class GitHubApiError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(message)
+        self.retryable = retryable
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,9 @@ class GitHubClient:
             base_url=settings.github_api_url,
             timeout=20,
         )
+
+    async def close(self) -> None:
+        await self._client.aclose()
 
     async def installation_token(
         self, installation_id: int, repository_id: int
@@ -85,6 +90,37 @@ class GitHubClient:
         )
         return CheckRun(id=int(response["id"]), html_url=str(response["html_url"]))
 
+    async def find_check_run(
+        self,
+        repository: str,
+        head_sha: str,
+        installation_token: str,
+        external_id: str,
+    ) -> CheckRun | None:
+        response = await self._request(
+            "GET",
+            f"/repos/{repository}/commits/{head_sha}/check-runs",
+            token=installation_token,
+            params={
+                "check_name": self.settings.check_name,
+                "filter": "all",
+                "per_page": "100",
+            },
+        )
+        raw_runs = response.get("check_runs", [])
+        if not isinstance(raw_runs, list):
+            raise GitHubApiError("GitHub returned malformed check runs")
+        for raw_run in raw_runs:
+            if (
+                isinstance(raw_run, dict)
+                and raw_run.get("external_id") == external_id
+            ):
+                return CheckRun(
+                    id=int(raw_run["id"]),
+                    html_url=str(raw_run["html_url"]),
+                )
+        return None
+
     async def dispatch_workflow(
         self,
         repository: str,
@@ -95,6 +131,7 @@ class GitHubClient:
         head_sha: str,
         pull_request_number: int,
         check_run_id: int,
+        external_id: str,
     ) -> WorkflowRun:
         response = await self._request(
             "POST",
@@ -108,6 +145,7 @@ class GitHubClient:
                     "head_sha": head_sha,
                     "pull_request_number": str(pull_request_number),
                     "check_run_id": str(check_run_id),
+                    "delivery_id": external_id.removeprefix("fraeno:"),
                 },
             },
         )
@@ -115,6 +153,37 @@ class GitHubClient:
             id=int(response["workflow_run_id"]),
             html_url=str(response["html_url"]),
         )
+
+    async def find_workflow_run(
+        self,
+        repository: str,
+        installation_token: str,
+        delivery_id: str,
+    ) -> WorkflowRun | None:
+        response = await self._request(
+            "GET",
+            f"/repos/{repository}/actions/workflows/"
+            f"{self.settings.workflow_file}/runs",
+            token=installation_token,
+            params={
+                "event": "workflow_dispatch",
+                "per_page": "100",
+            },
+        )
+        raw_runs = response.get("workflow_runs", [])
+        if not isinstance(raw_runs, list):
+            raise GitHubApiError("GitHub returned malformed workflow runs")
+        expected_title = f"Fraeno {delivery_id}"
+        for raw_run in raw_runs:
+            if (
+                isinstance(raw_run, dict)
+                and raw_run.get("display_title") == expected_title
+            ):
+                return WorkflowRun(
+                    id=int(raw_run["id"]),
+                    html_url=str(raw_run["html_url"]),
+                )
+        return None
 
     async def update_check_run(
         self,
@@ -148,23 +217,35 @@ class GitHubClient:
         path: str,
         *,
         token: str,
-        json: dict[str, Any],
+        json: dict[str, Any] | None = None,
+        params: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        response = await self._client.request(
-            method,
-            path,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {token}",
-                "X-GitHub-Api-Version": self.settings.github_api_version,
-                "User-Agent": "fraeno-github-app",
-            },
-            json=json,
-        )
+        try:
+            response = await self._client.request(
+                method,
+                path,
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "Authorization": f"Bearer {token}",
+                    "X-GitHub-Api-Version": self.settings.github_api_version,
+                    "User-Agent": "fraeno-github-app",
+                },
+                json=json,
+                params=params,
+            )
+        except httpx.RequestError as error:
+            raise GitHubApiError(
+                "GitHub API request failed before a response",
+                retryable=True,
+            ) from error
         if response.is_error:
             request_id = response.headers.get("x-github-request-id", "unknown")
             raise GitHubApiError(
-                f"GitHub API returned {response.status_code}; request id {request_id}"
+                f"GitHub API returned {response.status_code}; request id {request_id}",
+                retryable=(
+                    response.status_code in {408, 429}
+                    or response.status_code >= 500
+                ),
             )
         if not response.content:
             return {}

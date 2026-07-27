@@ -1,5 +1,5 @@
 name: Fraeno robot integration
-run-name: Fraeno PR #${{ inputs.pull_request_number }}
+run-name: Fraeno ${{ inputs.delivery_id }}
 
 on:
   workflow_dispatch:
@@ -18,6 +18,10 @@ on:
         type: string
       check_run_id:
         description: Fraeno check run
+        required: true
+        type: string
+      delivery_id:
+        description: GitHub webhook delivery
         required: true
         type: string
 

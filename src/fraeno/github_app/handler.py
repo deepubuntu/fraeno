@@ -39,13 +39,21 @@ class EventHandler:
                 await self._workflow_run(payload)
             elif event == "check_run":
                 await self._check_run(delivery_id, payload)
-        except (GitHubApiError, KeyError, TypeError, ValueError):
+        except GitHubApiError as error:
             LOGGER.exception(
                 "GitHub event processing failed",
                 extra={"event": event, "delivery_id": delivery_id},
             )
-            await self.store.fail_delivery(delivery_id)
-            raise
+            if error.retryable:
+                await self.store.fail_delivery(delivery_id)
+                raise
+            await self.store.complete_delivery(delivery_id)
+        except (KeyError, TypeError, ValueError):
+            LOGGER.exception(
+                "GitHub event payload was invalid",
+                extra={"event": event, "delivery_id": delivery_id},
+            )
+            await self.store.complete_delivery(delivery_id)
         else:
             await self.store.complete_delivery(delivery_id)
 
@@ -99,19 +107,29 @@ class EventHandler:
         full_name = str(repository["full_name"])
         default_branch = str(repository["default_branch"])
         token = await self.client.installation_token(installation_id, repository_id)
-        check = await self.client.create_check_run(
-            full_name, head_sha, token, f"fraeno:{delivery_id}"
+        external_id = f"fraeno:{delivery_id}"
+        check = await self.client.find_check_run(
+            full_name, head_sha, token, external_id
         )
-        try:
-            workflow = await self.client.dispatch_workflow(
-                full_name,
-                default_branch,
-                token,
-                base_sha=base_sha,
-                head_sha=head_sha,
-                pull_request_number=pull_request_number,
-                check_run_id=check.id,
+        if check is None:
+            check = await self.client.create_check_run(
+                full_name, head_sha, token, external_id
             )
+        try:
+            workflow = await self.client.find_workflow_run(
+                full_name, token, delivery_id
+            )
+            if workflow is None:
+                workflow = await self.client.dispatch_workflow(
+                    full_name,
+                    default_branch,
+                    token,
+                    base_sha=base_sha,
+                    head_sha=head_sha,
+                    pull_request_number=pull_request_number,
+                    check_run_id=check.id,
+                    external_id=external_id,
+                )
         except GitHubApiError:
             await self.client.update_check_run(
                 full_name,
@@ -129,18 +147,6 @@ class EventHandler:
             )
             raise
 
-        await self.client.update_check_run(
-            full_name,
-            check.id,
-            token,
-            status="in_progress",
-            details_url=workflow.html_url,
-            title="Testing the complete robot system",
-            summary=(
-                "Fraeno is running the base and candidate commits in matching "
-                "environments."
-            ),
-        )
         await self.store.save_run(
             RunRecord.create(
                 workflow_run_id=workflow.id,
@@ -153,14 +159,32 @@ class EventHandler:
                 details_url=workflow.html_url,
             )
         )
+        await self.client.update_check_run(
+            full_name,
+            check.id,
+            token,
+            status="in_progress",
+            details_url=workflow.html_url,
+            title="Testing the complete robot system",
+            summary=(
+                "Fraeno is running the base and candidate commits in matching "
+                "environments."
+            ),
+        )
 
     async def _workflow_run(self, payload: dict[str, Any]) -> None:
         if payload.get("action") != "completed":
             return
         workflow_run = payload["workflow_run"]
+        raw_path = str(workflow_run.get("path") or "").split("@", maxsplit=1)[0]
+        if not raw_path.endswith(f"/{self.client.settings.workflow_file}"):
+            return
         record = await self.store.get_run(int(workflow_run["id"]))
         if record is None:
-            return
+            raise GitHubApiError(
+                "Fraeno workflow completed before correlation was available",
+                retryable=True,
+            )
         if int(payload["repository"]["id"]) != record.repository_id:
             raise ValueError("workflow repository does not match stored run")
         token = await self.client.installation_token(
