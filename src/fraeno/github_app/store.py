@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any, Protocol
 
 
@@ -40,7 +40,7 @@ class RunRecord:
             pull_request_number=pull_request_number,
             head_sha=head_sha,
             details_url=details_url,
-            created_at=datetime.now(UTC).isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
         )
 
 
@@ -104,7 +104,7 @@ class FirestoreEventStore:
         await reference.set(
             {
                 "status": "processing",
-                "received_at": datetime.now(UTC),
+                "received_at": datetime.now(timezone.utc),
             }
         )
         return True
@@ -130,11 +130,11 @@ class FirestoreEventStore:
     async def complete_delivery(self, delivery_id: str) -> None:
         reference = self._client.collection("github_deliveries").document(delivery_id)
         await reference.update(
-            {"status": "completed", "completed_at": datetime.now(UTC)}
+            {"status": "completed", "completed_at": datetime.now(timezone.utc)}
         )
 
     async def fail_delivery(self, delivery_id: str) -> None:
         reference = self._client.collection("github_deliveries").document(delivery_id)
         await reference.update(
-            {"status": "failed", "failed_at": datetime.now(UTC)}
+            {"status": "failed", "failed_at": datetime.now(timezone.utc)}
         )

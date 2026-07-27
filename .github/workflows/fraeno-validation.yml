@@ -47,20 +47,25 @@ jobs:
           path: candidate
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install trusted Fraeno engine
-        run: python -m pip install ./baseline
+      - name: Build trusted ROS 2 runner
+        run: >-
+          docker build
+          --file baseline/fixtures/ros2_qos_robot/Dockerfile.runner
+          --tag fraeno-ros2-runner:${{ inputs.check_run_id }}
+          baseline
 
       - name: Validate baseline and candidate
         run: >-
+          docker run --rm
+          --volume "$PWD/baseline:/work/baseline"
+          --volume "$PWD/candidate:/work/candidate"
+          --volume "$PWD:/output"
+          fraeno-ros2-runner:${{ inputs.check_run_id }}
           fraeno validate
-          --baseline baseline
-          --candidate candidate
-          --config baseline/.fraeno.yml
-          --output fraeno-report.json
+          --baseline /work/baseline
+          --candidate /work/candidate
+          --config /work/baseline/.fraeno.yml
+          --output /output/fraeno-report.json
 
       - name: Upload complete Fraeno report
         if: always()

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import configparser
 import re
-import tomllib
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
+import tomli
 import yaml
 from packaging.requirements import InvalidRequirement, Requirement
 
@@ -165,7 +165,7 @@ class RepositoryScanner:
         return dependencies
 
     def _parse_pyproject(self, path: Path, relative: str) -> list[Dependency]:
-        data = tomllib.loads(path.read_text())
+        data = tomli.loads(path.read_text())
         project = data.get("project", {})
         groups: list[tuple[str, list[str]]] = [
             ("runtime", project.get("dependencies", [])),
