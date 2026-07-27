@@ -165,7 +165,7 @@ def stop_process(process: subprocess.Popen[bytes]) -> None:
 
 
 def main() -> int:
-    os.environ["ROS_DOMAIN_ID"] = str(random.randint(10, 200))
+    os.environ.setdefault("ROS_DOMAIN_ID", str(random.randint(10, 200)))
     processes = [
         subprocess.Popen(
             ["ros2", "run", "fraeno_ros_fixture", executable],

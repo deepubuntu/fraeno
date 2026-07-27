@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import subprocess
 import sys
 import time
@@ -78,7 +79,13 @@ def run_validation(
     candidate_path: Path,
     config: FraenoConfig,
 ) -> ValidationRun:
-    baseline = run_workspace(baseline_path, config, "baseline")
+    baseline_domain_id = secrets.randbelow(50) * 2 + 1
+    baseline = run_workspace(
+        baseline_path,
+        config,
+        "baseline",
+        ros_domain_id=baseline_domain_id,
+    )
     if not baseline.succeeded:
         return ValidationRun(
             baseline=baseline,
@@ -86,7 +93,12 @@ def run_validation(
             comparison=None,
         )
 
-    candidate = run_workspace(candidate_path, config, "candidate")
+    candidate = run_workspace(
+        candidate_path,
+        config,
+        "candidate",
+        ros_domain_id=baseline_domain_id + 1,
+    )
     if (
         not candidate.succeeded
         or baseline.observation is None
@@ -107,6 +119,8 @@ def run_workspace(
     workspace: Path,
     config: FraenoConfig,
     phase: str,
+    *,
+    ros_domain_id: int | None = None,
 ) -> WorkspaceRun:
     workspace = workspace.resolve()
     if not workspace.is_dir():
@@ -120,6 +134,8 @@ def run_workspace(
     )
     environment["FRAENO_PHASE"] = phase
     environment["FRAENO_PROJECT"] = config.project_name
+    if ros_domain_id is not None:
+        environment["ROS_DOMAIN_ID"] = str(ros_domain_id)
     step_results: list[StepResult] = []
 
     for step in config.validation.steps:

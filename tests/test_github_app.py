@@ -3,6 +3,7 @@ import hmac
 import json
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from fraeno.github_app.app import create_webhook_app, create_worker_app
@@ -104,6 +105,35 @@ def test_webhook_is_verified_and_deduplicated_by_queue() -> None:
     assert first.status_code == 202
     assert second.status_code == 202
     assert len(enqueuer.events) == 1
+
+
+def test_webhook_secret_ignores_file_ending_newline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FRAENO_GITHUB_WEBHOOK_SECRET", "test-secret\n")
+    monkeypatch.setenv("FRAENO_GCP_PROJECT", "project")
+    monkeypatch.setenv("FRAENO_GCP_LOCATION", "us-central1")
+    monkeypatch.setenv("FRAENO_TASK_QUEUE", "queue")
+    monkeypatch.setenv("FRAENO_WORKER_URL", "https://worker.example")
+    monkeypatch.setenv(
+        "FRAENO_TASK_SERVICE_ACCOUNT",
+        "tasks@project.iam.gserviceaccount.com",
+    )
+    settings = WebhookSettings.from_environment()
+    enqueuer = RecordingEnqueuer()
+    app = create_webhook_app(settings, enqueuer)
+    body = json.dumps({"zen": "Keep it logically awesome."}).encode()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/webhooks/github",
+            content=body,
+            headers=signed_headers(body, "test-secret", "newline-delivery"),
+        )
+
+    assert settings.webhook_secret == "test-secret"
+    assert response.status_code == 202
+    assert "newline-delivery" in enqueuer.events
 
 
 def test_invalid_webhook_signature_is_rejected() -> None:
