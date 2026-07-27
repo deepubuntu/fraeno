@@ -258,6 +258,11 @@ jobs:
           docker pull "$rollback_reference"
           bash tests/container/test-external-runner.sh "$rollback_reference"
 
+      - name: Set up Buildx for attestations
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          driver: docker-container
+
       - name: Publish immutable runner with attestations
         run: |
           docker buildx build \

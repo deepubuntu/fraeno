@@ -34,13 +34,13 @@ GCP_WORKLOAD_IDENTITY_PROVIDER=projects/286435890377/locations/global/workloadId
 GCP_RELEASE_SERVICE_ACCOUNT=fraeno-runner-publisher@deepubuntu-32f9e.iam.gserviceaccount.com
 ```
 
-The workload identity provider must accept only the GitHub subject
-`repo:deepubuntu/fraeno:environment:runner-production`, repository ID
-`1313414423`, owner ID `224500479`, and workflow
-`deepubuntu/fraeno/.github/workflows/publish-runner.yml@refs/heads/main`.
+The workload identity provider must accept only tokens where the repository is
+`deepubuntu/fraeno`, the repository ID is `1313414423`, the owner ID is
+`224500479`, the ref is `refs/heads/main`, the workflow name is
+`Publish immutable Fraeno runner`, and the event is `workflow_dispatch`.
 Map `assertion.repository_id` to `attribute.repository_id`, then grant that
-principal `roles/iam.workloadIdentityUser` on the dedicated publisher service
-account.
+repository principal `roles/iam.workloadIdentityUser` on the dedicated
+publisher service account. The provider condition enforces every other claim.
 
 The publisher service account needs `roles/artifactregistry.writer` only on the
 `fraeno-runner` repository. It does not need project editor, Cloud Run admin,

@@ -63,6 +63,11 @@ def test_release_docs_name_only_the_public_runner_repository() -> None:
     assert "`us-central1`, and `fraeno-runner`" in release_docs
     assert "update fraeno-runner" in release_docs
     assert "private mixed `fraeno`" in release_docs
+    assert "`deepubuntu/fraeno`" in release_docs
+    assert "`refs/heads/main`" in release_docs
+    assert "`Publish immutable Fraeno runner`" in release_docs
+    assert "`workflow_dispatch`" in release_docs
+    assert "job_workflow_ref" not in release_docs
 
 
 def test_release_workflow_tests_and_gates_before_publish() -> None:
@@ -74,13 +79,16 @@ def test_release_workflow_tests_and_gates_before_publish() -> None:
     container_position = workflow.index("Build and test the exact runner")
     gate_position = workflow.index("Require every release check")
     auth_position = workflow.index("Authenticate to Google Cloud")
+    buildx_position = workflow.index("Set up Buildx for attestations")
     publish_position = workflow.index("Publish immutable runner")
     assert 'python-version: "3.11"' in workflow
     assert python_position < identity_position
     assert test_position < auth_position
     assert container_position < auth_position
     assert gate_position < auth_position
+    assert "driver: docker-container" in workflow
     assert auth_position < publish_position
+    assert buildx_position < publish_position
     for check in (
         "Fraeno / robot integration",
         "container",
