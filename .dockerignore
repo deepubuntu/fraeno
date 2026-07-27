@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+.fraeno
+__pycache__
+*.pyc
+.coverage
+.mypy_cache
+.pytest_cache
+.ruff_cache
+build
+dist
+fixtures
+tests

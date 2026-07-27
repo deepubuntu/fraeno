@@ -1,0 +1,72 @@
+name: Fraeno robot integration
+run-name: Fraeno PR #${{ inputs.pull_request_number }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: Trusted base commit
+        required: true
+        type: string
+      head_sha:
+        description: Candidate commit
+        required: true
+        type: string
+      pull_request_number:
+        description: Pull request number
+        required: true
+        type: string
+      check_run_id:
+        description: Fraeno check run
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fraeno-${{ inputs.check_run_id }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out trusted baseline
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_sha }}
+          path: baseline
+          persist-credentials: false
+
+      - name: Check out candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head_sha }}
+          path: candidate
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install trusted Fraeno engine
+        run: python -m pip install ./baseline
+
+      - name: Validate baseline and candidate
+        run: >-
+          fraeno validate
+          --baseline baseline
+          --candidate candidate
+          --config baseline/.fraeno.yml
+          --output fraeno-report.json
+
+      - name: Upload complete Fraeno report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fraeno-report-${{ inputs.check_run_id }}
+          path: fraeno-report.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,28 @@
+version: 1
+
+project:
+  name: deterministic-robot
+
+validation:
+  steps:
+    - name: compile fixture
+      command: ["python3", "-m", "compileall", "-q", "."]
+      timeout_seconds: 30
+  observe:
+    command: ["python3", "observe.py"]
+    timeout_seconds: 10
+  contract:
+    required_nodes:
+      - /sensor_driver
+      - /controller
+    required_topics:
+      - /sensor/reading
+      - /robot/command
+    required_services:
+      - /robot/health
+    required_actions:
+      - /robot/move
+    minimum_topic_rates_hz:
+      /sensor/reading: 15
+      /robot/command: 7
+    maximum_topic_rate_regression_percent: 30

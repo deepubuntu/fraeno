@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "healthy": false,
+  "graph_stable": true,
+  "graph": {
+    "nodes": ["/controller", "/sensor_driver"],
+    "topics": [
+      {
+        "name": "/sensor/reading",
+        "types": ["std_msgs/msg/Float64"],
+        "publishers": [
+          {
+            "node": "/sensor_driver",
+            "qos": {
+              "reliability": "best_effort",
+              "durability": "volatile",
+              "history": "keep_last",
+              "depth": 10
+            }
+          }
+        ],
+        "subscribers": [
+          {
+            "node": "/controller",
+            "qos": {
+              "reliability": "reliable",
+              "durability": "volatile",
+              "history": "keep_last",
+              "depth": 10
+            }
+          }
+        ],
+        "rate_hz": 20.0,
+        "message_count": 100
+      },
+      {
+        "name": "/robot/command",
+        "types": ["std_msgs/msg/Float64"],
+        "publishers": [
+          {
+            "node": "/controller",
+            "qos": {
+              "reliability": "reliable",
+              "durability": "volatile"
+            }
+          }
+        ],
+        "subscribers": [],
+        "rate_hz": 0.0,
+        "message_count": 0
+      }
+    ],
+    "services": [
+      {"name": "/robot/health", "types": ["std_srvs/srv/Trigger"]}
+    ],
+    "actions": [
+      {"name": "/robot/move", "types": ["example_interfaces/action/Fibonacci"]}
+    ]
+  },
+  "transforms": ["base_link->sensor_link"],
+  "diagnostics": {
+    "controller": 2,
+    "sensor_driver": 0
+  },
+  "metadata": {
+    "dependency_version": "2.0.0"
+  }
+}

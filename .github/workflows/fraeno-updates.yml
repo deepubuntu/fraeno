@@ -1,0 +1,60 @@
+name: Fraeno dependency updates
+
+on:
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  propose:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install .
+      - name: Apply one update
+        run: fraeno update-next . --output fraeno-update.json
+      - name: Detect changed files
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create update pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dependency="$(python -c 'import json; print(json.load(open("fraeno-update.json"))["update"]["dependency"])')"
+          previous="$(python -c 'import json; print(json.load(open("fraeno-update.json"))["update"]["previous"])')"
+          target="$(python -c 'import json; print(json.load(open("fraeno-update.json"))["update"]["target"])')"
+          safe_name="$(printf '%s' "$dependency" | tr ':_/' '---')"
+          branch="fraeno/update-${safe_name}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "fraeno[bot]"
+          git config user.email "fraeno[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add --update
+          git commit -m "Update $dependency to $target"
+          git push --set-upstream origin "$branch"
+          printf 'Fraeno updated `%s` from `%s` to `%s`.\n\nThe Fraeno robot integration check must pass before merge.\n' "$dependency" "$previous" "$target" > /tmp/fraeno-pr-body.md
+          gh pr create \
+            --base "${GITHUB_REF_NAME:-main}" \
+            --head "$branch" \
+            --title "Update $dependency to $target" \
+            --body-file /tmp/fraeno-pr-body.md
+      - name: Preserve update evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fraeno-update
+          path: fraeno-update.json
+          if-no-files-found: error
+          retention-days: 14
