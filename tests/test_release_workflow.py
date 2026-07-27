@@ -449,6 +449,42 @@ def test_registry_tag_resolver_fails_closed_on_invalid_inventory(
 def test_control_release_proves_rollback_and_restores_candidate() -> None:
     workflow = CONTROL_RELEASE_WORKFLOW.read_text()
 
+    state_position = workflow.index(
+        "Require immutable repository and exact production state"
+    )
+    publish_position = workflow.index(
+        "Publish or resume immutable release candidate"
+    )
+    token_position = workflow.index("Mint the private worker smoke token")
+    deploy_position = workflow.index(
+        "Deploy, prove rollback, and restore the release"
+    )
+    assert (
+        state_position < publish_position < token_position < deploy_position
+    )
+    token_step = workflow[token_position:deploy_position]
+    assert (
+        "google-github-actions/auth@"
+        "7c6bc770dae815cd3e89ee6cdf493a5fab2cc093" in token_step
+    )
+    assert "token_format: id_token" in token_step
+    assert (
+        "id_token_audience: "
+        "${{ steps.production-state.outputs.worker_audience }}"
+        in token_step
+    )
+    assert "create_credentials_file: false" in token_step
+    assert "export_environment_variables: false" in token_step
+    assert "gcloud auth print-identity-token" not in workflow
+    deploy_step = workflow[deploy_position:]
+    assert (
+        "PRIVATE_WORKER_ID_TOKEN: "
+        "${{ steps.worker-token.outputs.id_token }}" in deploy_step
+    )
+    assert 'test "$audience" = "$WORKER_AUDIENCE"' in deploy_step
+    assert 'test -n "$PRIVATE_WORKER_ID_TOKEN"' in deploy_step
+    assert "worker service URL is not a canonical run.app URL" in workflow
+    assert 'parsed.hostname.startswith(f"{service}-")' in workflow
     candidate = 'set_traffic "$WORKER_SERVICE" "$worker_candidate_revision"'
     rollback = 'set_traffic "$WORKER_SERVICE" "$PREVIOUS_WORKER_REVISION"'
     assert workflow.count(candidate) == 2

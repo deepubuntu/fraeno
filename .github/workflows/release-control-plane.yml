@@ -276,6 +276,7 @@ jobs:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
       - name: Require immutable repository and exact production state
+        id: production-state
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -588,6 +589,34 @@ jobs:
               sort_keys=True,
           )
           PY
+          worker_audience="$(
+            python - "$WORKER_SERVICE" <<'PY'
+          import json
+          import sys
+          from urllib.parse import urlsplit
+
+          service = sys.argv[1]
+          url = json.load(open("previous-worker.json"))["url"]
+          parsed = urlsplit(url)
+          if (
+              parsed.scheme != "https"
+              or parsed.username is not None
+              or parsed.password is not None
+              or parsed.port is not None
+              or parsed.path not in {"", "/"}
+              or parsed.query
+              or parsed.fragment
+              or parsed.hostname is None
+              or not parsed.hostname.endswith(".a.run.app")
+              or not parsed.hostname.startswith(f"{service}-")
+              or "\n" in url
+              or "\r" in url
+          ):
+              raise SystemExit("worker service URL is not a canonical run.app URL")
+          print(url.removesuffix("/"))
+          PY
+          )"
+          echo "worker_audience=$worker_audience" >> "$GITHUB_OUTPUT"
 
       - name: Configure Artifact Registry
         run: gcloud auth configure-docker "$REGISTRY" --quiet
@@ -633,8 +662,22 @@ jobs:
           echo "CONTROL_PLANE_DIGEST=$digest" >> "$GITHUB_ENV"
           echo "CANDIDATE_IMAGE_TAG=$candidate_tag" >> "$GITHUB_ENV"
 
+      - name: Mint the private worker smoke token
+        id: worker-token
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_RELEASE_SERVICE_ACCOUNT }}
+          token_format: id_token
+          id_token_audience: ${{ steps.production-state.outputs.worker_audience }}
+          create_credentials_file: false
+          export_environment_variables: false
+
       - name: Deploy, prove rollback, and restore the release
         id: deploy
+        env:
+          PRIVATE_WORKER_ID_TOKEN: ${{ steps.worker-token.outputs.id_token }}
+          WORKER_AUDIENCE: ${{ steps.production-state.outputs.worker_audience }}
         run: |
           set -Eeuo pipefail
 
@@ -672,13 +715,12 @@ jobs:
             local audience="${3:-}"
             local response
             if [[ -n "$audience" ]]; then
-              token="$(
-                gcloud auth print-identity-token --audiences "$audience"
-              )"
+              test "$audience" = "$WORKER_AUDIENCE"
+              test -n "$PRIVATE_WORKER_ID_TOKEN"
               response="$(
                 curl --fail --silent --show-error \
                   --retry 5 --retry-all-errors \
-                  --header "Authorization: Bearer $token" \
+                  --header "Authorization: Bearer $PRIVATE_WORKER_ID_TOKEN" \
                   "$url/health"
               )"
             else
@@ -732,6 +774,10 @@ jobs:
               --quiet >/dev/null
           }
 
+          if [[ -z "${PRIVATE_WORKER_ID_TOKEN:-}" ]]; then
+            echo "The private worker smoke token is missing." >&2
+            exit 2
+          fi
           deploy_candidate "$WORKER_SERVICE"
           deploy_candidate "$WEBHOOK_SERVICE"
           worker_candidate_revision="$WORKER_SERVICE-$revision_suffix"

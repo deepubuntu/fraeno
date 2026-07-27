@@ -47,7 +47,6 @@ def test_rotation_workflow_is_manual_keyless_and_defaults_to_dry_run() -> None:
     assert privileged_python_calls
     assert unisolated_python_commands(privileged_job) == []
     assert "python -S -m fraeno.credential_rotation" in privileged_job
-    assert "python -S -c" in privileged_job
     assert "python -S -" in privileged_job
 
 
@@ -80,6 +79,40 @@ def test_rotation_and_release_share_one_non_canceling_production_lock() -> None:
 def test_rotation_workflow_pins_secret_versions_and_stages_without_traffic() -> None:
     workflow = WORKFLOW.read_text()
 
+    state_position = workflow.index(
+        "Require exact versions and unchanged production"
+    )
+    inspect_position = workflow.index("Inspect exact staged revisions")
+    token_position = workflow.index(
+        "Mint the private worker verification token"
+    )
+    verify_position = workflow.index(
+        "Verify both staged webhook secrets and App keys"
+    )
+    assert state_position < inspect_position < token_position < verify_position
+    token_step = workflow[token_position:verify_position]
+    assert "if: inputs.mode == 'stage'" in token_step
+    assert (
+        "google-github-actions/auth@"
+        "7c6bc770dae815cd3e89ee6cdf493a5fab2cc093" in token_step
+    )
+    assert "token_format: id_token" in token_step
+    assert (
+        "id_token_audience: "
+        "${{ steps.production-state.outputs.worker_audience }}"
+        in token_step
+    )
+    assert "create_credentials_file: false" in token_step
+    assert "export_environment_variables: false" in token_step
+    assert "gcloud auth print-identity-token" not in workflow
+    verification = workflow[verify_position:]
+    assert (
+        "FRAENO_WORKER_ID_TOKEN: "
+        "${{ steps.worker-token.outputs.id_token }}" in verification
+    )
+    assert "private worker verification token is missing" in verification
+    assert "worker service URL is not a canonical run.app URL" in workflow
+    assert 'parsed.hostname.startswith(f"{service}-")' in workflow
     assert "--no-traffic" in workflow
     assert workflow.count("--no-traffic") == 3
     assert "FRAENO_GITHUB_WEBHOOK_SECRET_PREVIOUS" in workflow
