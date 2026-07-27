@@ -225,9 +225,13 @@ finishes successfully.
 
 The cleanup policy in `deploy/gcp/control-plane-cleanup-policy.json` runs in
 dry-run mode. It always keeps semantic release tags and the ten most recent
-versions. Only failed candidates older than 90 days and untagged content older
-than 30 days are eligible for deletion. Review the dry-run audit before ever
-enabling deletion:
+versions. Only untagged content older than 30 days is eligible for deletion.
+Artifact Registry does not delete tagged artifacts while immutable tags are
+enabled. Successful candidate tags share layers with their semantic release,
+and failed candidate tags are intentionally retained as evidence. If measured
+failed-build storage becomes material, use a separate mutable staging
+repository rather than weakening the release repository. Review the dry-run
+audit before ever enabling deletion:
 
 ```bash
 gcloud artifacts repositories set-cleanup-policies fraeno-control-plane \

@@ -1,18 +1,5 @@
 [
   {
-    "name": "delete-old-failed-candidates",
-    "action": {
-      "type": "Delete"
-    },
-    "condition": {
-      "tagState": "tagged",
-      "tagPrefixes": [
-        "candidate-"
-      ],
-      "olderThan": "7776000s"
-    }
-  },
-  {
     "name": "delete-old-untagged-content",
     "action": {
       "type": "Delete"
