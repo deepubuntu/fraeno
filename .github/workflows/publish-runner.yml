@@ -44,6 +44,8 @@ jobs:
       EXPECTED_GCP_PROJECT_ID: deepubuntu-32f9e
       EXPECTED_GCP_LOCATION: us-central1
       EXPECTED_GCP_REPOSITORY: fraeno-runner
+      EXPECTED_GCP_WORKLOAD_IDENTITY_PROVIDER: projects/286435890377/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-runner
+      EXPECTED_GCP_RELEASE_SERVICE_ACCOUNT: fraeno-runner-publisher@deepubuntu-32f9e.iam.gserviceaccount.com
       PYTHONPATH: src
     steps:
       - name: Check out the exact reviewed commit
@@ -170,6 +172,18 @@ jobs:
           fi
           if [[ "$GCP_REPOSITORY" != "$EXPECTED_GCP_REPOSITORY" ]]; then
             echo "Runner releases must use public repository $EXPECTED_GCP_REPOSITORY." >&2
+            exit 2
+          fi
+          if [[ "$GCP_WORKLOAD_IDENTITY_PROVIDER" != \
+            "$EXPECTED_GCP_WORKLOAD_IDENTITY_PROVIDER" ]]
+          then
+            echo "Runner releases must use the dedicated workload identity provider." >&2
+            exit 2
+          fi
+          if [[ "$GCP_RELEASE_SERVICE_ACCOUNT" != \
+            "$EXPECTED_GCP_RELEASE_SERVICE_ACCOUNT" ]]
+          then
+            echo "Runner releases must use the dedicated publisher service account." >&2
             exit 2
           fi
 

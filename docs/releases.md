@@ -27,13 +27,28 @@ GCP_RELEASE_SERVICE_ACCOUNT
 For the current GCP target, the first three values are `deepubuntu-32f9e`,
 `us-central1`, and `fraeno-runner`.
 
-The workload identity provider must trust only this repository and the
-`runner-production` GitHub environment. Its service account needs Artifact
-Registry writer access only on the `fraeno-runner` repository. It does not need
-project editor, Cloud Run admin, service-account key creation, or Secret
-Manager access.
+Use these exact values for the remaining two variables:
 
-Configure required reviewers on the `runner-production` GitHub environment.
+```text
+GCP_WORKLOAD_IDENTITY_PROVIDER=projects/286435890377/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-runner
+GCP_RELEASE_SERVICE_ACCOUNT=fraeno-runner-publisher@deepubuntu-32f9e.iam.gserviceaccount.com
+```
+
+The workload identity provider must accept only the GitHub subject
+`repo:deepubuntu/fraeno:environment:runner-production`, repository ID
+`1313414423`, owner ID `224500479`, and workflow
+`deepubuntu/fraeno/.github/workflows/publish-runner.yml@refs/heads/main`.
+Map `assertion.repository_id` to `attribute.repository_id`, then grant that
+principal `roles/iam.workloadIdentityUser` on the dedicated publisher service
+account.
+
+The publisher service account needs `roles/artifactregistry.writer` only on the
+`fraeno-runner` repository. It does not need project editor, Cloud Run admin,
+service-account key creation, or Secret Manager access.
+
+Allow deployments to `runner-production` only from `main` and configure a
+required reviewer when the GitHub plan supports it. The workflow uses no GitHub
+secret for Google credentials.
 The repository must remain publicly readable through
 `roles/artifactregistry.reader` for `allUsers`. Enable immutable tags on the
 existing repository:

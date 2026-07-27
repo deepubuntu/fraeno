@@ -31,7 +31,24 @@ def test_release_workflow_uses_wif_and_direct_artifact_registry() -> None:
     assert "EXPECTED_GCP_PROJECT_ID: deepubuntu-32f9e" in workflow
     assert "EXPECTED_GCP_LOCATION: us-central1" in workflow
     assert "EXPECTED_GCP_REPOSITORY: fraeno-runner" in workflow
+    assert (
+        "EXPECTED_GCP_WORKLOAD_IDENTITY_PROVIDER: "
+        "projects/286435890377/locations/global/workloadIdentityPools/"
+        "fraeno-github/providers/fraeno-runner"
+    ) in workflow
+    assert (
+        "EXPECTED_GCP_RELEASE_SERVICE_ACCOUNT: "
+        "fraeno-runner-publisher@deepubuntu-32f9e.iam.gserviceaccount.com"
+    ) in workflow
     assert 'GCP_REPOSITORY" != "$EXPECTED_GCP_REPOSITORY' in workflow
+    assert (
+        'GCP_WORKLOAD_IDENTITY_PROVIDER" != '
+        "\\\n            \"$EXPECTED_GCP_WORKLOAD_IDENTITY_PROVIDER\""
+    ) in workflow
+    assert (
+        'GCP_RELEASE_SERVICE_ACCOUNT" != '
+        "\\\n            \"$EXPECTED_GCP_RELEASE_SERVICE_ACCOUNT\""
+    ) in workflow
     assert "-docker.pkg.dev" in workflow
     assert "supabase" not in workflow.lower()
     assert "render" not in workflow.lower()
