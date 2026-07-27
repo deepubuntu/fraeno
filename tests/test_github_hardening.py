@@ -418,6 +418,7 @@ class StaticReconciler:
 def test_reconcile_endpoint_requires_cloud_scheduler_identity() -> None:
     app = create_worker_app(
         AppSettings("1", "key"),
+        object(),  # type: ignore[arg-type]
         reconciler=StaticReconciler(),  # type: ignore[arg-type]
     )
     with TestClient(app) as client:
