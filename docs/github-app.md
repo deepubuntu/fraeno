@@ -217,14 +217,13 @@ Before customer installation:
 
 ## Repository runner contract
 
-Copy the files in `templates/github/` into the same paths in the customer
-repository. Set the repository variable `FRAENO_RUNNER_IMAGE` to a published
-Fraeno runner image including its full `@sha256:` digest. A tag alone is
-rejected.
+Run `fraeno init --open-pr` to propose the trusted files in the customer
+repository. The command sets `FRAENO_RUNNER_IMAGE` to the published runner
+image including its full `@sha256:` digest. A tag alone is rejected.
 
 The project contract must live at `.fraeno.yml` on the base branch. Observation
 commands that use repository code should call the trusted copy through
 `FRAENO_TRUSTED_ROOT`. The candidate can read this copy but cannot change it.
 
-The complete isolation model and local verification command are in
-`docs/runner.md`.
+The complete setup is in `docs/onboarding.md`. The isolation model and local
+verification command are in `docs/runner.md`.

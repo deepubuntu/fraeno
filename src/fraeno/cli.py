@@ -18,6 +18,11 @@ from fraeno.lockfile import (
     write_lockfile,
 )
 from fraeno.models import ScanReport
+from fraeno.onboarding import (
+    CheckStatus,
+    doctor_repository,
+    initialize_repository,
+)
 from fraeno.scanner import RepositoryScanner
 from fraeno.update_discovery import FixtureUpdateCatalog, discover_updates
 from fraeno.update_policy import OpenUpdatePullRequest, plan_updates
@@ -157,6 +162,54 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path(".fraeno.yml"),
     )
     observe_ros2_command.add_argument("--output", "-o", type=Path)
+
+    init = commands.add_parser(
+        "init",
+        help="Create the trusted files needed to add Fraeno to a robot repository.",
+    )
+    init.add_argument("repository", nargs="?", default=".", type=Path)
+    init.add_argument("--project-name")
+    init.add_argument(
+        "--build-command",
+        default="colcon build --event-handlers console_direct+",
+    )
+    init.add_argument("--setup-script", default="install/setup.bash")
+    init.add_argument("--launch-command", required=True)
+    init.add_argument("--required-node", action="append", default=[])
+    init.add_argument("--required-topic", action="append", default=[])
+    init.add_argument("--required-service", action="append", default=[])
+    init.add_argument("--required-action", action="append", default=[])
+    init.add_argument("--required-transform", action="append", default=[])
+    init.add_argument("--required-diagnostic", action="append", default=[])
+    init.add_argument("--rate-topic", action="append", default=[])
+    init.add_argument("--diagnostics-topic", action="append", default=[])
+    init.add_argument("--transform-topic", action="append", default=[])
+    init.add_argument(
+        "--open-pr",
+        action="store_true",
+        help="Commit and push a dedicated branch, then open a draft pull request.",
+    )
+    init.add_argument("--branch", default="fraeno/onboarding")
+    init.add_argument("--runner-image")
+
+    doctor = commands.add_parser(
+        "doctor",
+        help="Check local and GitHub requirements before the first Fraeno run.",
+    )
+    doctor.add_argument("repository", nargs="?", default=".", type=Path)
+    doctor.add_argument("--github-repository")
+    doctor.add_argument("--pull-request", type=int)
+    doctor.add_argument(
+        "--run-observer",
+        action="store_true",
+        help="Launch the configured target and require healthy observer evidence.",
+    )
+    doctor.add_argument(
+        "--local-only",
+        action="store_true",
+        help="Skip GitHub checks while preparing files locally.",
+    )
+    doctor.add_argument("--json", action="store_true")
     return parser
 
 
@@ -187,6 +240,10 @@ def main(argv: list[str] | None = None) -> int:
             return _assemble_report(args)
         if args.command == "observe-ros2":
             return _observe_ros2(args)
+        if args.command == "init":
+            return _init(args)
+        if args.command == "doctor":
+            return _doctor(args)
     except (
         ConfigError,
         ObservationError,
@@ -404,6 +461,78 @@ def _observe_ros2(args: argparse.Namespace) -> int:
     observation = observe_ros2(config.validation.ros2_observer)
     _write_or_print(observation.to_dict(), args.output)
     return 0
+
+
+def _init(args: argparse.Namespace) -> int:
+    repository = args.repository.resolve()
+    result = initialize_repository(
+        repository,
+        project_name=args.project_name or repository.name,
+        build_command=args.build_command,
+        setup_script=args.setup_script,
+        launch_command=args.launch_command,
+        required_nodes=tuple(args.required_node),
+        required_topics=tuple(args.required_topic),
+        required_services=tuple(args.required_service),
+        required_actions=tuple(args.required_action),
+        required_transforms=tuple(args.required_transform),
+        required_diagnostics=tuple(args.required_diagnostic),
+        rate_topics=tuple(args.rate_topic),
+        diagnostics_topics=tuple(args.diagnostics_topic),
+        transform_topics=tuple(args.transform_topic),
+        open_pull_request=args.open_pr,
+        branch=args.branch,
+        runner_image=args.runner_image,
+    )
+    for path in result.created:
+        print(f"created {path.relative_to(result.repository).as_posix()}")
+    if result.pull_request_url is not None:
+        print(f"pull request {result.pull_request_url}")
+    else:
+        print("Review the files, then run fraeno doctor --local-only.")
+    return 0
+
+
+def _doctor(args: argparse.Namespace) -> int:
+    report = doctor_repository(
+        args.repository,
+        github_repository=args.github_repository,
+        pull_request=args.pull_request,
+        run_observer=args.run_observer,
+        local_only=args.local_only,
+    )
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+    else:
+        labels = {
+            CheckStatus.PASS: "pass",
+            CheckStatus.WARNING: "note",
+            CheckStatus.FAIL: "fail",
+        }
+        for check in report.checks:
+            print(f"[{labels[check.status]}] {check.name}  {check.message}")
+            if check.fix is not None:
+                print(f"       Next  {check.fix}")
+        print(
+            "Live observer  "
+            + ("verified" if report.live_observer_verified else "not verified")
+        )
+        print(
+            "GitHub App  "
+            + (
+                "verified on a pull request"
+                if report.github_app_verified
+                else "not verified"
+            )
+        )
+        if report.ready:
+            print("Fraeno doctor found no blocking problems.")
+        else:
+            failed = sum(
+                check.status is CheckStatus.FAIL for check in report.checks
+            )
+            print(f"Fraeno doctor found {failed} blocking problem(s).")
+    return 0 if report.ready else 1
 
 
 def _observation_from_file(path: Path) -> SystemObservation:

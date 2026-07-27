@@ -1,0 +1,187 @@
+name: Fraeno dependency updates
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: fraeno-dependency-updates
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    runs-on: ubuntu-22.04
+    env:
+      FRAENO_RUNNER_IMAGE: ${{ vars.FRAENO_RUNNER_IMAGE }}
+    steps:
+      - name: Require an immutable Fraeno runner
+        run: |
+          if [[ "$FRAENO_RUNNER_IMAGE" != *@sha256:* ]]; then
+            echo "Set FRAENO_RUNNER_IMAGE to a Fraeno runner pinned by digest." >&2
+            exit 2
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+
+      - name: Read open Fraeno pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh pr list
+          --state open
+          --limit 100
+          --json number,headRefName,headRefOid,title,body
+          > fraeno-open-pull-requests.json
+
+      - name: Apply one policy-approved proposal
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          arguments=(
+            propose-update .
+            --config .fraeno.yml
+            --open-pull-requests fraeno-open-pull-requests.json
+            --ros-distro humble
+            --os ubuntu
+            --os-version 22.04
+            --architecture amd64
+            --output fraeno-update.json
+          )
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            arguments+=(--ignore-schedule)
+          fi
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "$PWD:/workspace" \
+            --volume "$PWD/.git:/workspace/.git:ro" \
+            --workdir /workspace \
+            "$FRAENO_RUNNER_IMAGE" \
+            "${arguments[@]}"
+
+      - name: Detect changed files
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check update boundary
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+
+          payload = json.load(open("fraeno-update.json"))
+          expected = set(payload["proposal"]["changed_files"])
+          actual = set(
+              subprocess.run(
+                  ["git", "diff", "--name-only"],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              ).stdout.splitlines()
+          )
+          if not expected or actual != expected:
+              raise SystemExit(
+                  f"unexpected changed files: expected {sorted(expected)}, "
+                  f"found {sorted(actual)}"
+              )
+          PY
+
+      - name: Prepare pull request
+        if: steps.changes.outputs.changed == 'true'
+        id: proposal
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          proposal = json.load(open("fraeno-update.json"))["proposal"]
+          Path("/tmp/fraeno-pr-title.txt").write_text(proposal["title"] + "\n")
+          Path("/tmp/fraeno-pr-body.md").write_text(proposal["body"])
+          print(f'branch={proposal["branch"]}')
+          print(
+              "existing_pull_request="
+              + (
+                  str(proposal["existing_pull_request"])
+                  if proposal["existing_pull_request"] is not None
+                  else ""
+              )
+          )
+          print(f'existing_head_sha={proposal["existing_head_sha"]}')
+          PY
+
+      - name: Publish deterministic update branch
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="${{ steps.proposal.outputs.branch }}"
+          title="$(cat /tmp/fraeno-pr-title.txt)"
+          expected_remote_sha="${{ steps.proposal.outputs.existing_head_sha }}"
+          gh auth setup-git
+          git config user.name "fraeno[bot]"
+          git config user.email "fraeno[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add --update
+          git commit -m "$title"
+          remote_sha="$(
+            git ls-remote --heads origin "refs/heads/$branch" |
+              awk 'NR == 1 {print $1}'
+          )"
+          if [[ -n "$expected_remote_sha" && "$remote_sha" != "$expected_remote_sha" ]]; then
+            echo "The existing update branch changed after policy planning." >&2
+            exit 1
+          fi
+          if [[ -n "$remote_sha" ]]; then
+            git push \
+              --force-with-lease="refs/heads/$branch:$remote_sha" \
+              origin "HEAD:refs/heads/$branch"
+          else
+            git push origin "HEAD:refs/heads/$branch"
+          fi
+
+      - name: Create or refresh update pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          branch="${{ steps.proposal.outputs.branch }}"
+          title="$(cat /tmp/fraeno-pr-title.txt)"
+          existing="${{ steps.proposal.outputs.existing_pull_request }}"
+          if [[ -n "$existing" ]]; then
+            gh pr edit "$existing" \
+              --title "$title" \
+              --body-file /tmp/fraeno-pr-body.md
+          else
+            gh pr create \
+              --base "$DEFAULT_BRANCH" \
+              --head "$branch" \
+              --title "$title" \
+              --body-file /tmp/fraeno-pr-body.md
+          fi
+
+      - name: Preserve update evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fraeno-update
+          path: |
+            fraeno-update.json
+            fraeno-open-pull-requests.json
+          if-no-files-found: error
+          retention-days: 14
