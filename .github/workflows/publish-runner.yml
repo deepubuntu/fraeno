@@ -1,0 +1,297 @@
+name: Publish immutable Fraeno runner
+run-name: Publish runner v${{ inputs.version }} from ${{ inputs.commit_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: SemVer without a leading v
+        required: true
+        type: string
+      commit_sha:
+        description: Full reviewed commit SHA reachable from main
+        required: true
+        type: string
+      previous_digest:
+        description: Previous production sha256 digest, or none for the first release
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  id-token: write
+
+concurrency:
+  group: fraeno-runner-production
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    environment: runner-production
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_SHA: ${{ inputs.commit_sha }}
+      PREVIOUS_DIGEST: ${{ inputs.previous_digest }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_LOCATION: ${{ vars.GCP_ARTIFACT_REGISTRY_LOCATION }}
+      GCP_REPOSITORY: ${{ vars.GCP_ARTIFACT_REGISTRY_REPOSITORY }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_RELEASE_SERVICE_ACCOUNT: ${{ vars.GCP_RELEASE_SERVICE_ACCOUNT }}
+    steps:
+      - name: Check out the exact reviewed commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release identity
+        run: |
+          python scripts/release_safety.py validate-inputs \
+            --version "$RELEASE_VERSION" \
+            --commit-sha "$RELEASE_SHA" \
+            --previous-digest "$PREVIOUS_DIGEST"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          python - "$RELEASE_VERSION" <<'PY'
+          import sys
+          import tomllib
+
+          project = tomllib.load(open("pyproject.toml", "rb"))["project"]
+          if project["version"] != sys.argv[1]:
+              raise SystemExit(
+                  f"release {sys.argv[1]} does not match package {project['version']}"
+              )
+          PY
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Test the exact release commit
+        run: |
+          python -m pip install ".[dev,app]"
+          pytest --cov=fraeno --cov-report=term-missing
+          ruff check .
+          mypy --strict src
+
+      - name: Build and test the exact runner
+        run: |
+          docker build \
+            --file runner/Dockerfile \
+            --build-arg "FRAENO_VERSION=$RELEASE_VERSION" \
+            --build-arg "FRAENO_REVISION=$RELEASE_SHA" \
+            --tag fraeno-runner:release-candidate \
+            .
+          bash tests/container/test-external-runner.sh \
+            fraeno-runner:release-candidate
+
+      - name: Require every release check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/pulls" \
+            > associated-pulls.json
+          python scripts/release_safety.py select-reviewed-pr \
+            --input associated-pulls.json \
+            --commit-sha "$RELEASE_SHA" \
+            --output reviewed-pr.json
+          reviewed_sha="$(
+            python -c \
+              'import json; print(json.load(open("reviewed-pr.json"))["reviewed_sha"])'
+          )"
+          reviewed_tree="$(
+            gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "/repos/$GITHUB_REPOSITORY/git/commits/$reviewed_sha" \
+              --jq ".tree.sha"
+          )"
+          release_tree="$(git rev-parse "$RELEASE_SHA^{tree}")"
+          if [[ "$reviewed_tree" != "$release_tree" ]]; then
+            echo "Reviewed and release commits do not contain the same files." >&2
+            exit 2
+          fi
+          gh api \
+            --paginate \
+            --slurp \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/check-runs?per_page=100" \
+            > release-check-runs.json
+          gh api \
+            --paginate \
+            --slurp \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/$GITHUB_REPOSITORY/commits/$reviewed_sha/check-runs?per_page=100" \
+            > reviewed-check-runs.json
+          python scripts/release_safety.py verify-checks \
+            --input release-check-runs.json \
+            --reviewed-input reviewed-check-runs.json \
+            --commit-sha "$RELEASE_SHA" \
+            --reviewed-sha "$reviewed_sha" \
+            --output selected-release-checks.json
+
+      - name: Require release configuration
+        run: |
+          for name in \
+            GCP_PROJECT_ID \
+            GCP_LOCATION \
+            GCP_REPOSITORY \
+            GCP_WORKLOAD_IDENTITY_PROVIDER \
+            GCP_RELEASE_SERVICE_ACCOUNT
+          do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing repository variable $name" >&2
+              exit 2
+            fi
+          done
+
+      - name: Authenticate to Google Cloud with workload identity
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_RELEASE_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Require immutable repository and unused tags
+        run: |
+          repository_format="$(
+            gcloud artifacts repositories describe "$GCP_REPOSITORY" \
+              --location "$GCP_LOCATION" \
+              --project "$GCP_PROJECT_ID" \
+              --format "value(format)"
+          )"
+          test "$repository_format" = "DOCKER"
+          immutable_tags="$(
+            gcloud artifacts repositories describe "$GCP_REPOSITORY" \
+              --location "$GCP_LOCATION" \
+              --project "$GCP_PROJECT_ID" \
+              --format "value(dockerConfig.immutableTags)"
+          )"
+          if [[ "${immutable_tags,,}" != "true" ]]; then
+            echo "Artifact Registry must enforce immutable tags." >&2
+            exit 2
+          fi
+          registry="${GCP_LOCATION}-docker.pkg.dev"
+          repository_path="$registry/$GCP_PROJECT_ID/$GCP_REPOSITORY"
+          image="$repository_path/runner"
+          echo "REGISTRY=$registry" >> "$GITHUB_ENV"
+          echo "REPOSITORY_PATH=$repository_path" >> "$GITHUB_ENV"
+          echo "RUNNER_IMAGE=$image" >> "$GITHUB_ENV"
+          for reference in "$image:v$RELEASE_VERSION" "$image:$RELEASE_SHA"
+          do
+            if gcloud artifacts docker images describe "$reference" \
+              --project "$GCP_PROJECT_ID" >/dev/null 2>&1
+            then
+              echo "Release tag already exists: $reference" >&2
+              exit 2
+            fi
+          done
+
+      - name: Configure Artifact Registry
+        run: gcloud auth configure-docker "$REGISTRY" --quiet
+
+      - name: Test the protected rollback image
+        run: |
+          if [[ "$PREVIOUS_DIGEST" = "none" ]]; then
+            existing="$(
+              gcloud artifacts docker images list "$RUNNER_IMAGE" \
+                --project "$GCP_PROJECT_ID" \
+                --format "value(version)" \
+                --limit 1
+            )"
+            if [[ -n "$existing" ]]; then
+              echo "A previous runner exists, so its digest is required." >&2
+              exit 2
+            fi
+            exit 0
+          fi
+          rollback_reference="$RUNNER_IMAGE@$PREVIOUS_DIGEST"
+          gcloud artifacts docker images describe "$rollback_reference" \
+            --project "$GCP_PROJECT_ID" >/dev/null
+          docker pull "$rollback_reference"
+          bash tests/container/test-external-runner.sh "$rollback_reference"
+
+      - name: Publish immutable runner with attestations
+        run: |
+          docker buildx build \
+            --file runner/Dockerfile \
+            --build-arg "FRAENO_VERSION=$RELEASE_VERSION" \
+            --build-arg "FRAENO_REVISION=$RELEASE_SHA" \
+            --tag "$RUNNER_IMAGE:v$RELEASE_VERSION" \
+            --tag "$RUNNER_IMAGE:$RELEASE_SHA" \
+            --sbom=true \
+            --provenance=mode=max \
+            --metadata-file buildkit-metadata.json \
+            --push \
+            .
+          digest="$(
+            python scripts/release_safety.py extract-digest \
+              --input buildkit-metadata.json
+          )"
+          echo "RUNNER_DIGEST=$digest" >> "$GITHUB_ENV"
+
+      - name: Verify published tags and write rollback evidence
+        run: |
+          semantic_digest="$(
+            gcloud artifacts docker images describe \
+              "$RUNNER_IMAGE:v$RELEASE_VERSION" \
+              --project "$GCP_PROJECT_ID" \
+              --format "value(image_summary.digest)"
+          )"
+          commit_digest="$(
+            gcloud artifacts docker images describe \
+              "$RUNNER_IMAGE:$RELEASE_SHA" \
+              --project "$GCP_PROJECT_ID" \
+              --format "value(image_summary.digest)"
+          )"
+          test "$semantic_digest" = "$RUNNER_DIGEST"
+          test "$commit_digest" = "$RUNNER_DIGEST"
+          docker buildx imagetools inspect \
+            "$RUNNER_IMAGE@$RUNNER_DIGEST" >/dev/null
+          python scripts/release_safety.py write-manifest \
+            --version "$RELEASE_VERSION" \
+            --commit-sha "$RELEASE_SHA" \
+            --image "$RUNNER_IMAGE" \
+            --digest "$RUNNER_DIGEST" \
+            --previous-digest "$PREVIOUS_DIGEST" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --checks selected-release-checks.json \
+            --output fraeno-runner-release.json
+          sha256sum fraeno-runner-release.json \
+            > fraeno-runner-release.json.sha256
+          {
+            echo "## Immutable Fraeno runner"
+            echo
+            echo "\`$RUNNER_IMAGE@$RUNNER_DIGEST\`"
+            echo
+            echo "No mutable alias was published."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve release and rollback evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fraeno-runner-v${{ inputs.version }}-evidence
+          path: |
+            buildkit-metadata.json
+            fraeno-runner-release.json
+            fraeno-runner-release.json.sha256
+            reviewed-pr.json
+            selected-release-checks.json
+          if-no-files-found: error
+          retention-days: 90

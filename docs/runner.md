@@ -25,6 +25,10 @@ REGISTRY/IMAGE@sha256:FULL_DIGEST
 
 The workflow rejects mutable tags.
 
+Fraeno's own runner publisher also uses immutable Artifact Registry tags and
+records the final digest, SBOM, provenance, and previous production digest.
+See `docs/releases.md` for the release gate and rollback evidence.
+
 ## What the runner protects
 
 The host starts three containers.
