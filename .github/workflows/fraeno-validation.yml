@@ -12,6 +12,14 @@ on:
         description: Candidate commit
         required: true
         type: string
+      base_repository:
+        description: Trusted base repository
+        required: true
+        type: string
+      head_repository:
+        description: Candidate repository
+        required: true
+        type: string
       pull_request_number:
         description: Pull request number
         required: true
@@ -40,6 +48,7 @@ jobs:
       - name: Check out trusted baseline
         uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.base_repository }}
           ref: ${{ inputs.base_sha }}
           path: baseline
           persist-credentials: false
@@ -47,6 +56,7 @@ jobs:
       - name: Check out candidate
         uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.head_repository }}
           ref: ${{ inputs.head_sha }}
           path: candidate
           persist-credentials: false

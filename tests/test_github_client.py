@@ -1,4 +1,6 @@
+import io
 import json
+import zipfile
 
 import httpx
 import pytest
@@ -26,6 +28,8 @@ async def test_workflow_dispatch_carries_recovery_identity() -> None:
         payload = json.loads(request.content)
         assert payload["inputs"]["delivery_id"] == "delivery-7"
         assert payload["inputs"]["head_sha"] == "candidate"
+        assert payload["inputs"]["base_repository"] == "deepubuntu/fraeno"
+        assert payload["inputs"]["head_repository"] == "contributor/fraeno"
         return httpx.Response(
             200,
             json={"workflow_run_id": 300, "html_url": "https://github.test/run/300"},
@@ -38,6 +42,8 @@ async def test_workflow_dispatch_carries_recovery_identity() -> None:
         "token",
         base_sha="baseline",
         head_sha="candidate",
+        base_repository="deepubuntu/fraeno",
+        head_repository="contributor/fraeno",
         pull_request_number=7,
         check_run_id=200,
         external_id="fraeno:delivery-7",
@@ -45,6 +51,85 @@ async def test_workflow_dispatch_carries_recovery_identity() -> None:
     await client.close()
 
     assert run.id == 300
+
+
+@pytest.mark.anyio
+async def test_pull_request_returns_current_head_and_fork_repository() -> None:
+    async def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "number": 7,
+                "title": "Update driver",
+                "state": "open",
+                "draft": False,
+                "head": {
+                    "sha": "candidate",
+                    "repo": {"full_name": "contributor/fraeno"},
+                },
+                "base": {
+                    "sha": "baseline",
+                    "repo": {"full_name": "deepubuntu/fraeno"},
+                },
+            },
+        )
+
+    client = client_with(httpx.MockTransport(respond))
+    pull_request = await client.pull_request("deepubuntu/fraeno", 7, "token")
+    await client.close()
+
+    assert pull_request.head_sha == "candidate"
+    assert pull_request.head_repository == "contributor/fraeno"
+    assert pull_request.base_repository == "deepubuntu/fraeno"
+
+
+@pytest.mark.anyio
+async def test_validation_report_is_loaded_from_expected_artifact() -> None:
+    report = {
+        "outcome": "block",
+        "comparison": {"validation_level": "L2", "findings": []},
+    }
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, "w") as bundle:
+        bundle.writestr("fraeno-report.json", json.dumps(report))
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/artifacts"):
+            return httpx.Response(
+                200,
+                json={
+                    "artifacts": [
+                        {
+                            "name": "fraeno-report-200",
+                            "expired": False,
+                            "archive_download_url": "https://github.test/artifact.zip",
+                        }
+                    ]
+                },
+            )
+        assert request.url.path == "/artifact.zip"
+        return httpx.Response(200, content=archive_buffer.getvalue())
+
+    client = client_with(httpx.MockTransport(respond))
+    loaded = await client.validation_report(
+        "deepubuntu/fraeno",
+        workflow_run_id=300,
+        check_run_id=200,
+        installation_token="token",
+    )
+    await client.close()
+
+    assert loaded == report
+
+
+@pytest.mark.anyio
+async def test_cancel_already_completed_workflow_is_safe() -> None:
+    async def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(409)
+
+    client = client_with(httpx.MockTransport(respond))
+    await client.cancel_workflow_run("deepubuntu/fraeno", 300, "token")
+    await client.close()
 
 
 @pytest.mark.anyio
