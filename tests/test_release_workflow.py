@@ -21,6 +21,12 @@ CONTROL_IMAGE = (
 CONTROL_COMMIT = "a" * 40
 CONTROL_DIGEST = "sha256:" + ("b" * 64)
 SECOND_CONTROL_DIGEST = "sha256:" + ("c" * 64)
+CONTROL_PACKAGE_ROOT = (
+    "projects/deepubuntu-32f9e/locations/us-central1/repositories/"
+    "fraeno-control-plane/packages/control-plane"
+)
+CONTROL_TAG_ROOT = f"{CONTROL_PACKAGE_ROOT}/tags"
+CONTROL_VERSION_ROOT = f"{CONTROL_PACKAGE_ROOT}/versions"
 
 
 def _registry_tag_resolver_source() -> str:
@@ -49,6 +55,7 @@ def _run_registry_tag_resolver(
             sys.executable,
             "-",
             CONTROL_IMAGE,
+            CONTROL_TAG_ROOT,
             "v0.2.0",
             CONTROL_COMMIT,
             str(inventory_path),
@@ -281,9 +288,9 @@ def test_control_release_requires_same_commit_runner_evidence() -> None:
 def test_control_release_lists_tags_without_parsing_error_messages() -> None:
     workflow = CONTROL_RELEASE_WORKFLOW.read_text()
 
-    assert "gcloud artifacts docker images list" in workflow
-    assert "--include-tags" in workflow
-    assert "--format json > control-plane-images.json" in workflow
+    assert workflow.count("gcloud artifacts docker tags list") == 2
+    assert "--include-tags" not in workflow
+    assert "--format json > control-plane-tags.json" in workflow
     assert "describe_optional_digest" not in workflow
     assert 'grep --quiet "NOT_FOUND"' not in workflow
     assert "semantic_digest=\"$(<semantic-tag-digest.txt)\"" in workflow
@@ -320,27 +327,24 @@ def test_registry_tag_resolver_treats_an_empty_inventory_as_a_new_release(
     assert commit == ""
 
 
-@pytest.mark.parametrize(
-    "tags",
-    [
-        ["v0.2.0", CONTROL_COMMIT],
-        f"v0.2.0,{CONTROL_COMMIT}",
-    ],
-)
 def test_registry_tag_resolver_returns_exact_structured_digests(
     tmp_path: Path,
-    tags: list[str] | str,
 ) -> None:
     inventory = [
         {
-            "package": "us-central1-docker.pkg.dev/other/repository/image",
-            "tags": ["v0.2.0", CONTROL_COMMIT],
-            "version": SECOND_CONTROL_DIGEST,
+            "tag": f"{CONTROL_TAG_ROOT}/v0.2.0-near-match",
+            "image": CONTROL_IMAGE,
+            "version": f"{CONTROL_VERSION_ROOT}/{SECOND_CONTROL_DIGEST}",
         },
         {
-            "package": CONTROL_IMAGE,
-            "tags": tags,
-            "version": CONTROL_DIGEST,
+            "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+            "image": CONTROL_IMAGE,
+            "version": f"{CONTROL_VERSION_ROOT}/{CONTROL_DIGEST}",
+        },
+        {
+            "tag": f"{CONTROL_TAG_ROOT}/{CONTROL_COMMIT}",
+            "image": CONTROL_IMAGE,
+            "version": f"{CONTROL_VERSION_ROOT}/{CONTROL_DIGEST}",
         },
     ]
 
@@ -351,21 +355,63 @@ def test_registry_tag_resolver_returns_exact_structured_digests(
     assert commit == CONTROL_DIGEST
 
 
+@pytest.mark.parametrize("field", ["tag", "image", "version"])
+@pytest.mark.parametrize("value", ["missing", None, 17])
+def test_registry_tag_resolver_rejects_missing_or_non_string_fields(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    item: dict[str, object] = {
+        "tag": f"{CONTROL_TAG_ROOT}/unrelated",
+        "image": CONTROL_IMAGE,
+        "version": f"{CONTROL_VERSION_ROOT}/{CONTROL_DIGEST}",
+    }
+    if value == "missing":
+        item.pop(field)
+    else:
+        item[field] = value
+
+    result, _, _ = _run_registry_tag_resolver(tmp_path, [item])
+
+    assert result.returncode != 0
+    assert "must contain string tag, image, and version fields" in result.stderr
+
+
 @pytest.mark.parametrize(
     ("inventory", "message"),
     [
         ({}, "inventory must be a JSON list"),
         ([None], "inventory contains a non-object"),
         (
-            [{"package": CONTROL_IMAGE, "tags": 17, "version": CONTROL_DIGEST}],
-            "returned invalid tag data",
+            [
+                {
+                    "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+                    "image": "us-central1-docker.pkg.dev/other/repository/image",
+                    "version": f"{CONTROL_VERSION_ROOT}/{CONTROL_DIGEST}",
+                }
+            ],
+            "returned another image",
         ),
         (
             [
                 {
-                    "package": CONTROL_IMAGE,
-                    "tags": ["v0.2.0"],
-                    "version": "not-a-digest",
+                    "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+                    "image": CONTROL_IMAGE,
+                    "version": (
+                        "projects/other/locations/us-central1/repositories/"
+                        f"repository/packages/control-plane/versions/{CONTROL_DIGEST}"
+                    ),
+                }
+            ],
+            "returned an invalid version",
+        ),
+        (
+            [
+                {
+                    "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+                    "image": CONTROL_IMAGE,
+                    "version": f"{CONTROL_VERSION_ROOT}/not-a-digest",
                 }
             ],
             "returned an invalid digest",
@@ -373,14 +419,16 @@ def test_registry_tag_resolver_returns_exact_structured_digests(
         (
             [
                 {
-                    "package": CONTROL_IMAGE,
-                    "tags": ["v0.2.0"],
-                    "version": CONTROL_DIGEST,
+                    "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+                    "image": CONTROL_IMAGE,
+                    "version": f"{CONTROL_VERSION_ROOT}/{CONTROL_DIGEST}",
                 },
                 {
-                    "package": CONTROL_IMAGE,
-                    "tags": ["v0.2.0"],
-                    "version": SECOND_CONTROL_DIGEST,
+                    "tag": f"{CONTROL_TAG_ROOT}/v0.2.0",
+                    "image": CONTROL_IMAGE,
+                    "version": (
+                        f"{CONTROL_VERSION_ROOT}/{SECOND_CONTROL_DIGEST}"
+                    ),
                 },
             ],
             "returned more than one digest",

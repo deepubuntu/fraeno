@@ -330,12 +330,18 @@ jobs:
           registry="${GCP_LOCATION}-docker.pkg.dev"
           repository="$registry/$GCP_PROJECT_ID/$GCP_REPOSITORY"
           image="$registry/$GCP_PROJECT_ID/$GCP_REPOSITORY/control-plane"
+          tag_root="$(
+            printf "projects/%s/locations/%s/repositories/%s/packages/%s/tags" \
+              "$GCP_PROJECT_ID" \
+              "$GCP_LOCATION" \
+              "$GCP_REPOSITORY" \
+              "control-plane"
+          )"
           echo "REGISTRY=$registry" >> "$GITHUB_ENV"
           echo "CONTROL_PLANE_IMAGE=$image" >> "$GITHUB_ENV"
-          gcloud artifacts docker images list "$repository" \
+          gcloud artifacts docker tags list "$repository" \
             --project "$GCP_PROJECT_ID" \
-            --include-tags \
-            --format json > control-plane-images.json
+            --format json > control-plane-tags.json
           # REGISTRY_TAG_RESOLVER_START
           cat > "$RUNNER_TEMP/resolve-control-plane-tags.py" <<'PY'
           import json
@@ -343,46 +349,54 @@ jobs:
           import sys
           from pathlib import Path
 
-          image, semantic_tag, commit_tag, inventory_path, *output_paths = sys.argv[1:]
+          (
+              image,
+              tag_root,
+              semantic_tag,
+              commit_tag,
+              inventory_path,
+              *output_paths,
+          ) = sys.argv[1:]
           payload = json.loads(Path(inventory_path).read_text())
           if not isinstance(payload, list):
               raise SystemExit("Artifact Registry inventory must be a JSON list.")
 
           targets = (semantic_tag, commit_tag)
+          expected_tags = {f"{tag_root}/{tag}": tag for tag in targets}
+          version_root = tag_root.removesuffix("/tags") + "/versions/"
           matches = {tag: set() for tag in targets}
           digest_pattern = re.compile(r"sha256:[0-9a-f]{64}")
           for item in payload:
               if not isinstance(item, dict):
                   raise SystemExit("Artifact Registry inventory contains a non-object.")
-              if item.get("package") != image:
-                  continue
-              raw_tags = item.get("tags", [])
-              if raw_tags is None:
-                  tags = []
-              elif isinstance(raw_tags, list) and all(
-                  isinstance(tag, str) for tag in raw_tags
+              tag_resource = item.get("tag")
+              image_resource = item.get("image")
+              version = item.get("version")
+              if not all(
+                  isinstance(field, str)
+                  for field in (tag_resource, image_resource, version)
               ):
-                  tags = raw_tags
-              elif isinstance(raw_tags, str):
-                  tags = [
-                      tag.strip()
-                      for tag in raw_tags.split(",")
-                      if tag.strip()
-                  ]
-              else:
-                  raise SystemExit("Artifact Registry returned invalid tag data.")
-              for tag in targets:
-                  if tag not in tags:
-                      continue
-                  digest = item.get("version")
-                  if (
-                      not isinstance(digest, str)
-                      or digest_pattern.fullmatch(digest) is None
-                  ):
-                      raise SystemExit(
-                          f"Artifact Registry returned an invalid digest for {tag}."
-                      )
-                  matches[tag].add(digest)
+                  raise SystemExit(
+                      "Artifact Registry inventory must contain string "
+                      "tag, image, and version fields."
+                  )
+              if tag_resource not in expected_tags:
+                  continue
+              tag = expected_tags[tag_resource]
+              if image_resource != image:
+                  raise SystemExit(
+                      f"Artifact Registry returned another image for {tag}."
+                  )
+              if not version.startswith(version_root):
+                  raise SystemExit(
+                      f"Artifact Registry returned an invalid version for {tag}."
+                  )
+              digest = version.removeprefix(version_root)
+              if digest_pattern.fullmatch(digest) is None:
+                  raise SystemExit(
+                      f"Artifact Registry returned an invalid digest for {tag}."
+                  )
+              matches[tag].add(digest)
 
           for tag, output_path in zip(targets, output_paths, strict=True):
               digests = matches[tag]
@@ -397,9 +411,10 @@ jobs:
           # REGISTRY_TAG_RESOLVER_END
           python "$RUNNER_TEMP/resolve-control-plane-tags.py" \
             "$image" \
+            "$tag_root" \
             "v$RELEASE_VERSION" \
             "$RELEASE_SHA" \
-            control-plane-images.json \
+            control-plane-tags.json \
             semantic-tag-digest.txt \
             commit-tag-digest.txt
           semantic_digest="$(<semantic-tag-digest.txt)"
@@ -922,16 +937,23 @@ jobs:
               "$GCP_PROJECT_ID" \
               "$GCP_REPOSITORY"
           )"
+          tag_root="$(
+            printf "projects/%s/locations/%s/repositories/%s/packages/%s/tags" \
+              "$GCP_PROJECT_ID" \
+              "$GCP_LOCATION" \
+              "$GCP_REPOSITORY" \
+              "control-plane"
+          )"
           refresh_tag_digests() {
-            gcloud artifacts docker images list "$repository" \
+            gcloud artifacts docker tags list "$repository" \
               --project "$GCP_PROJECT_ID" \
-              --include-tags \
-              --format json > "$RUNNER_TEMP/control-plane-images.json"
+              --format json > "$RUNNER_TEMP/control-plane-tags.json"
             python "$RUNNER_TEMP/resolve-control-plane-tags.py" \
               "$CONTROL_PLANE_IMAGE" \
+              "$tag_root" \
               "v$RELEASE_VERSION" \
               "$RELEASE_SHA" \
-              "$RUNNER_TEMP/control-plane-images.json" \
+              "$RUNNER_TEMP/control-plane-tags.json" \
               "$RUNNER_TEMP/semantic-tag-digest.txt" \
               "$RUNNER_TEMP/commit-tag-digest.txt"
             semantic_digest="$(<"$RUNNER_TEMP/semantic-tag-digest.txt")"
