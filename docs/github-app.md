@@ -65,7 +65,8 @@ FRAENO_SERVICE_MODE=webhook \
 ```
 
 Use `FRAENO_SERVICE_MODE=worker` to run the private worker. Both services expose
-`/healthz`; each response identifies its service role and configuration state.
+`/health`; each response identifies its service role and configuration state.
+Cloud Run reserves some paths ending in `z`, so Fraeno does not use `/healthz`.
 
 ## Production checks
 

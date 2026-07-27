@@ -83,7 +83,7 @@ def create_webhook_app(
     )
     app.state.enqueuer = enqueuer
 
-    @app.get("/healthz")
+    @app.get("/health")
     async def health() -> dict[str, Any]:
         return {
             "status": "ok",
@@ -160,7 +160,7 @@ def create_worker_app(
     )
     app.state.handler = handler
 
-    @app.get("/healthz")
+    @app.get("/health")
     async def health() -> dict[str, Any]:
         return {
             "status": "ok",
