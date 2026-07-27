@@ -22,14 +22,21 @@ The trusted workflow:
 The GitHub App:
 
 1. validates the raw webhook body with HMAC-SHA256;
-2. deduplicates `X-GitHub-Delivery`;
-3. exchanges a short-lived app JWT for a repository-scoped installation token;
-4. creates a queued Fraeno check;
-5. dispatches the trusted default-branch workflow;
-6. stores only repository IDs, commit SHAs, PR/check/run IDs, and timestamps;
-7. completes the check after the correlated workflow finishes.
+2. creates a deterministic Cloud Task from `X-GitHub-Delivery`;
+3. returns `202` before performing GitHub API work;
+4. invokes a separate private worker with a service-account OIDC token;
+5. deduplicates and tracks delivery state in Firestore;
+6. exchanges a short-lived app JWT for a repository-scoped installation token;
+7. creates a queued Fraeno check;
+8. dispatches the trusted default-branch workflow;
+9. stores only repository IDs, commit SHAs, PR/check/run IDs, and timestamps;
+10. completes the check after the correlated workflow finishes.
 
 The service does not persist installation tokens or customer source.
+
+The public webhook service has the webhook secret and permission to enqueue
+tasks, but no GitHub private key. The private worker has the GitHub private key
+and Firestore access, but does not accept public traffic.
 
 ## Dependency model
 

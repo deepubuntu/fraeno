@@ -60,16 +60,21 @@ The contract must come from the trusted base commit. A candidate cannot weaken i
 
 ## Safe and breaking proof
 
-The committed deterministic fixture models a sensor publisher and a reliable controller subscriber.
+The committed ROS 2 Humble fixture runs a live sensor publisher and reliable
+controller subscriber in separate processes. Fraeno observes the ROS graph,
+endpoint QoS, message rates, services, and diagnostics through `rclpy`.
 
 - `1.0.0` to `1.0.1` passes.
 - `1.0.0` to `2.0.0` builds, but changes the publisher to best effort. The reliable controller stops receiving data, `/robot/command` falls silent, diagnostics worsen, and Fraeno blocks the update.
 
-This is the first behavior ordinary dependency bots do not test.
+The same proof runs in GitHub Actions on every Fraeno pull request. This is the
+first behavior ordinary dependency bots do not test.
 
 ## GitHub App
 
-The app receives signed GitHub webhooks, creates `Fraeno / robot integration` checks, dispatches the trusted validation workflow, and completes each check from the correlated workflow result.
+The app receives signed GitHub webhooks, durably queues each delivery, creates
+`Fraeno / robot integration` checks, dispatches the trusted validation workflow,
+and completes each check from the correlated workflow result.
 
 Required repository permissions:
 

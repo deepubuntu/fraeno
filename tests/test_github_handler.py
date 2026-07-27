@@ -10,7 +10,7 @@ from fraeno.github_app.store import MemoryEventStore
 
 class FakeGitHubClient:
     def __init__(self) -> None:
-        self.settings = AppSettings("1", "key", "secret")
+        self.settings = AppSettings("1", "key")
         self.updates: list[dict[str, Any]] = []
         self.dispatches: list[dict[str, Any]] = []
 
@@ -29,6 +29,15 @@ class FakeGitHubClient:
         assert external_id.startswith("fraeno:")
         return CheckRun(200, "https://github.test/check/200")
 
+    async def find_check_run(
+        self,
+        repository: str,
+        head_sha: str,
+        token: str,
+        external_id: str,
+    ) -> CheckRun | None:
+        return None
+
     async def dispatch_workflow(
         self,
         repository: str,
@@ -44,6 +53,14 @@ class FakeGitHubClient:
             }
         )
         return WorkflowRun(300, "https://github.test/actions/runs/300")
+
+    async def find_workflow_run(
+        self,
+        repository: str,
+        token: str,
+        delivery_id: str,
+    ) -> WorkflowRun | None:
+        return None
 
     async def update_check_run(
         self,
@@ -101,6 +118,7 @@ async def test_pull_request_dispatches_and_completes_check() -> None:
             "repository": {"id": 100},
             "workflow_run": {
                 "id": 300,
+                "path": ".github/workflows/fraeno-validation.yml",
                 "conclusion": "success",
                 "html_url": "https://github.test/actions/runs/300",
             },

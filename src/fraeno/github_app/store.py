@@ -45,7 +45,9 @@ class RunRecord:
 
 
 class EventStore(Protocol):
-    async def claim_delivery(self, delivery_id: str) -> bool: ...
+    async def claim_delivery(
+        self, delivery_id: str, *, retry: bool = False
+    ) -> bool: ...
 
     async def save_run(self, record: RunRecord) -> None: ...
 
@@ -62,9 +64,14 @@ class MemoryEventStore:
         self._runs: dict[int, RunRecord] = {}
         self._lock = asyncio.Lock()
 
-    async def claim_delivery(self, delivery_id: str) -> bool:
+    async def claim_delivery(
+        self, delivery_id: str, *, retry: bool = False
+    ) -> bool:
         async with self._lock:
-            if delivery_id in self._deliveries:
+            status = self._deliveries.get(delivery_id)
+            if status == "completed":
+                return False
+            if status == "processing" and not retry:
                 return False
             self._deliveries[delivery_id] = "processing"
             return True
@@ -94,19 +101,27 @@ class FirestoreEventStore:
             client = firestore.AsyncClient()
         self._client = client
 
-    async def claim_delivery(self, delivery_id: str) -> bool:
+    async def claim_delivery(
+        self, delivery_id: str, *, retry: bool = False
+    ) -> bool:
+        from google.api_core.exceptions import AlreadyExists
+
         reference = self._client.collection("github_deliveries").document(delivery_id)
-        snapshot = await reference.get()
-        if snapshot.exists:
-            existing = snapshot.to_dict()
-            if isinstance(existing, dict) and existing.get("status") != "failed":
+        value = {
+            "status": "processing",
+            "received_at": datetime.now(timezone.utc),
+        }
+        try:
+            await reference.create(value)
+        except AlreadyExists:
+            snapshot = await reference.get()
+            existing = snapshot.to_dict() if snapshot.exists else None
+            status = existing.get("status") if isinstance(existing, dict) else None
+            if status == "completed":
                 return False
-        await reference.set(
-            {
-                "status": "processing",
-                "received_at": datetime.now(timezone.utc),
-            }
-        )
+            if status == "processing" and not retry:
+                return False
+            await reference.set(value)
         return True
 
     async def save_run(self, record: RunRecord) -> None:
