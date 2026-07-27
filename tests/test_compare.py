@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from fraeno.config import load_config
@@ -46,3 +47,40 @@ def test_unhealthy_baseline_is_error() -> None:
         observation("broken"), observation("safe"), config.validation
     )
     assert report.outcome is Outcome.ERROR
+
+
+def _with_topic_rate(
+    source: SystemObservation, topic_name: str, rate_hz: float
+) -> SystemObservation:
+    topics = dict(source.topics)
+    topics[topic_name] = replace(topics[topic_name], rate_hz=rate_hz)
+    return replace(source, topics=topics)
+
+
+def test_real_relative_rate_regression_still_blocks_above_absolute_minimum() -> None:
+    baseline = observation("baseline")
+    candidate = _with_topic_rate(observation("safe"), "/robot/command", 6.9)
+    config = replace(
+        load_config(FIXTURE / "fraeno.yml").validation,
+        minimum_topic_rates_hz={"/robot/command": 5.0},
+    )
+
+    report = compare_systems(baseline, candidate, config)
+
+    codes = {finding.code for finding in report.findings}
+    assert report.outcome is Outcome.BLOCK
+    assert "topic-rate-regressed" in codes
+    assert "topic-rate-below-minimum" not in codes
+
+
+def test_absolute_minimum_still_blocks_without_relative_regression() -> None:
+    baseline = observation("baseline")
+    candidate = _with_topic_rate(observation("safe"), "/sensor/reading", 14.9)
+    config = load_config(FIXTURE / "fraeno.yml").validation
+
+    report = compare_systems(baseline, candidate, config)
+
+    codes = {finding.code for finding in report.findings}
+    assert report.outcome is Outcome.BLOCK
+    assert "topic-rate-below-minimum" in codes
+    assert "topic-rate-regressed" not in codes
