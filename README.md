@@ -93,6 +93,10 @@ container.
 Every report identifies the exact Fraeno engine version. See
 `docs/runner.md` for the runner contract and local proof.
 
+Runner releases are built from reviewed commits, published directly to Google
+Artifact Registry, and consumed only by digest. The manual fail-closed release
+workflow and remaining production prerequisites are in `docs/releases.md`.
+
 ## Safe and breaking proof
 
 The committed ROS 2 Humble fixture runs a live sensor publisher and reliable
