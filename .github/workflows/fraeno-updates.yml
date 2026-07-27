@@ -2,12 +2,16 @@ name: Fraeno dependency updates
 
 on:
   schedule:
-    - cron: "17 9 * * 1"
+    - cron: "17 9 * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
+
+concurrency:
+  group: fraeno-dependency-updates
+  cancel-in-progress: false
 
 jobs:
   propose:
@@ -18,8 +22,29 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install .
-      - name: Apply one update
-        run: fraeno update-next . --output fraeno-update.json
+      - name: Read open Fraeno pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh pr list
+          --state open
+          --limit 100
+          --json number,headRefName,headRefOid,title,body
+          > fraeno-open-pull-requests.json
+      - name: Apply one policy-approved proposal
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          arguments=(
+            propose-update .
+            --config .fraeno.yml
+            --open-pull-requests fraeno-open-pull-requests.json
+            --output fraeno-update.json
+          )
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            arguments+=(--ignore-schedule)
+          fi
+          fraeno "${arguments[@]}"
       - name: Detect changed files
         id: changes
         run: |
@@ -28,33 +53,105 @@ jobs:
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
-      - name: Create update pull request
+      - name: Check update boundary
         if: steps.changes.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          dependency="$(python -c 'import json; print(json.load(open("fraeno-update.json"))["update"]["dependency"])')"
-          previous="$(python -c 'import json; print(json.load(open("fraeno-update.json"))["update"]["previous"])')"
-          target="$(python -c 'import json; print(json.load(open("fraeno-update.json"))["update"]["target"])')"
-          safe_name="$(printf '%s' "$dependency" | tr ':_/' '---')"
-          branch="fraeno/update-${safe_name}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          python - <<'PY'
+          import json
+          import subprocess
+
+          payload = json.load(open("fraeno-update.json"))
+          expected = set(payload["proposal"]["changed_files"])
+          actual = set(
+              subprocess.run(
+                  ["git", "diff", "--name-only"],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              ).stdout.splitlines()
+          )
+          if not expected or actual != expected:
+              raise SystemExit(
+                  f"unexpected changed files: expected {sorted(expected)}, "
+                  f"found {sorted(actual)}"
+              )
+          PY
+      - name: Prepare pull request
+        if: steps.changes.outputs.changed == 'true'
+        id: proposal
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          proposal = json.load(open("fraeno-update.json"))["proposal"]
+          Path("/tmp/fraeno-pr-title.txt").write_text(proposal["title"] + "\n")
+          Path("/tmp/fraeno-pr-body.md").write_text(proposal["body"])
+          print(f'branch={proposal["branch"]}')
+          print(f'action={proposal["action"]}')
+          print(
+              "existing_pull_request="
+              + (
+                  str(proposal["existing_pull_request"])
+                  if proposal["existing_pull_request"] is not None
+                  else ""
+              )
+          )
+          print(f'existing_head_sha={proposal["existing_head_sha"]}')
+          PY
+      - name: Publish deterministic update branch
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          branch="${{ steps.proposal.outputs.branch }}"
+          title="$(cat /tmp/fraeno-pr-title.txt)"
+          expected_remote_sha="${{ steps.proposal.outputs.existing_head_sha }}"
           git config user.name "fraeno[bot]"
           git config user.email "fraeno[bot]@users.noreply.github.com"
           git switch -c "$branch"
           git add --update
-          git commit -m "Update $dependency to $target"
-          git push --set-upstream origin "$branch"
-          printf 'Fraeno updated `%s` from `%s` to `%s`.\n\nThe Fraeno robot integration check must pass before merge.\n' "$dependency" "$previous" "$target" > /tmp/fraeno-pr-body.md
-          gh pr create \
-            --base "${GITHUB_REF_NAME:-main}" \
-            --head "$branch" \
-            --title "Update $dependency to $target" \
-            --body-file /tmp/fraeno-pr-body.md
+          git commit -m "$title"
+          remote_sha="$(
+            git ls-remote --heads origin "refs/heads/$branch" |
+              awk 'NR == 1 {print $1}'
+          )"
+          if [[ -n "$expected_remote_sha" && "$remote_sha" != "$expected_remote_sha" ]]; then
+            echo "The existing update branch changed after policy planning." >&2
+            exit 1
+          fi
+          if [[ -n "$remote_sha" ]]; then
+            git push \
+              --force-with-lease="refs/heads/$branch:$remote_sha" \
+              origin "HEAD:refs/heads/$branch"
+          else
+            git push origin "HEAD:refs/heads/$branch"
+          fi
+      - name: Create or refresh update pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          branch="${{ steps.proposal.outputs.branch }}"
+          title="$(cat /tmp/fraeno-pr-title.txt)"
+          existing="${{ steps.proposal.outputs.existing_pull_request }}"
+          if [[ -n "$existing" ]]; then
+            gh pr edit "$existing" \
+              --title "$title" \
+              --body-file /tmp/fraeno-pr-body.md
+          else
+            gh pr create \
+              --base "$DEFAULT_BRANCH" \
+              --head "$branch" \
+              --title "$title" \
+              --body-file /tmp/fraeno-pr-body.md
+          fi
       - name: Preserve update evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fraeno-update
-          path: fraeno-update.json
+          path: |
+            fraeno-update.json
+            fraeno-open-pull-requests.json
           if-no-files-found: error
           retention-days: 14

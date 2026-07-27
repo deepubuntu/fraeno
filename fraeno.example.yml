@@ -3,6 +3,31 @@ version: 1
 project:
   name: example-robot
 
+updates:
+  allow:
+    - dependency: "python:*"
+      update_types: [minor, patch]
+      cooldown_days: 7
+    - dependency: "docker:*"
+      update_types: [digest]
+    - dependency: "apt:*"
+      update_types: [major, minor, patch, unknown]
+    - dependency: "git:*"
+      update_types: [revision]
+  ignore:
+    - dependency: "python:legacy-driver"
+  update_types: [major, minor, patch, digest, revision, unknown]
+  cooldown_days: 3
+  groups:
+    - name: ROS runtime
+      patterns:
+        - "docker:ros"
+        - "apt:ros-*"
+  schedule:
+    interval: weekly
+    day: monday
+  max_open_pull_requests: 5
+
 validation:
   steps:
     - name: build ROS 2 workspace

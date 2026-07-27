@@ -67,6 +67,55 @@ def apply_update(
     *,
     dry_run: bool = False,
 ) -> UpdateResult:
+    return apply_updates(
+        root,
+        report,
+        ((identity, target),),
+        dry_run=dry_run,
+    )[0]
+
+
+def apply_updates(
+    root: Path,
+    report: ScanReport,
+    updates: Sequence[tuple[str, str]],
+    *,
+    dry_run: bool = False,
+) -> tuple[UpdateResult, ...]:
+    if not updates:
+        raise UpdateError("at least one dependency update is required")
+    working_text: dict[str, str] = {}
+    results: list[UpdateResult] = []
+    seen_identities: set[str] = set()
+    for identity, target in updates:
+        normalized_identity = identity.lower()
+        if normalized_identity in seen_identities:
+            raise UpdateError(f"dependency appears more than once: {identity}")
+        seen_identities.add(normalized_identity)
+        result = _plan_update(
+            root,
+            report,
+            identity,
+            target,
+            working_text,
+            dry_run=dry_run,
+        )
+        results.append(result)
+    if not dry_run:
+        for relative in sorted(working_text):
+            (root / relative).write_text(working_text[relative])
+    return tuple(results)
+
+
+def _plan_update(
+    root: Path,
+    report: ScanReport,
+    identity: str,
+    target: str,
+    working_text: dict[str, str],
+    *,
+    dry_run: bool,
+) -> UpdateResult:
     if ":" not in identity:
         raise UpdateError("dependency must use the form ecosystem:name")
     ecosystem_name, name = identity.split(":", maxsplit=1)
@@ -105,13 +154,12 @@ def apply_update(
             dependency for dependency in matches if dependency.source.path == relative
         ]
         path = root / relative
-        original = path.read_text()
+        original = working_text.get(relative, path.read_text())
         updated = _rewrite(path, original, source_matches, target)
         if updated == original:
             raise UpdateError(f"could not safely rewrite {relative}")
         changed_files.append(relative)
-        if not dry_run:
-            path.write_text(updated)
+        working_text[relative] = updated
 
     return UpdateResult(
         dependency=identity,
