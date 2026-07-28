@@ -78,3 +78,15 @@ def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None
     assert "—" not in visible_text
     assert ":" not in visible_text
     assert "A DeepUbuntu product" not in visible_text
+
+
+def test_site_shows_verified_external_proof_without_overclaiming() -> None:
+    page = (SITE / "index.html").read_text()
+
+    assert "Passed in 1m 38s" in page
+    assert (
+        "https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
+        in page
+    )
+    assert "A design partner running Fraeno on a real robot repository" in page
+    assert "It does not\n          claim that every possible robot behavior is safe." in page
