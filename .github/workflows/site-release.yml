@@ -46,7 +46,7 @@ jobs:
             --arg repository "$GITHUB_REPOSITORY" \
             '{commit: $commit, repository: $repository}' \
             > public/deploy.json
-          printf '/deploy.json\n  Cache-Control: no-store\n' > public/_headers
+          printf '\n/deploy.json\n  Cache-Control: no-store\n' >> public/_headers
 
       - name: Deploy to Cloudflare Pages
         env:

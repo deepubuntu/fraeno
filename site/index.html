@@ -10,7 +10,8 @@
     />
     <link rel="canonical" href="https://fraeno.com/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <meta name="theme-color" content="#f4f3ee" />
+    <link rel="preload" href="/assets/robot-system-poster.jpg" as="image" />
+    <meta name="theme-color" content="#f3f3ee" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Fraeno" />
     <meta
@@ -18,12 +19,6 @@
       content="Robot dependency updates tested against the complete robotic system."
     />
     <meta property="og:url" content="https://fraeno.com/" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;650;700&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="/styles.css" />
     <script src="/site.js" defer></script>
   </head>
@@ -61,79 +56,84 @@
     </header>
 
     <main id="main">
-      <section class="hero">
-        <div class="hero-copy" data-reveal>
-          <p class="eyebrow">Robot software updates tested before deployment</p>
-          <h1>
-            Update robot software
-            <em>without breaking the robot.</em>
-          </h1>
-          <p class="lede">
-            Fraeno automatically manages and updates robot software dependencies, and tests the
+      <section class="hero" data-cinematic-hero>
+        <div class="hero-grid">
+          <div class="hero-copy" data-reveal>
+            <p class="eyebrow">Robot software updates tested before deployment</p>
+            <h1>
+              Update robot software
+              <em>without breaking the robot.</em>
+            </h1>
+            <p class="lede">
+              Fraeno automatically manages and updates robot software dependencies, and tests the
             complete robotic system before changes are deployed.
-          </p>
-          <p class="plain-language">
-            <em>essentially, dependabot for robots + integration testing.</em>
-          </p>
-          <div class="actions">
-            <a class="button button-primary" href="https://github.com/apps/fraeno-robotics">
-              Install the GitHub App
-              <span aria-hidden="true">↗</span>
-            </a>
-            <a class="text-link" href="#proof">See the failure it caught</a>
+            </p>
+            <p class="plain-language">
+              <em>essentially, dependabot for robots + integration testing.</em>
+            </p>
+            <div class="actions">
+              <a class="button button-primary" href="https://github.com/apps/fraeno-robotics">
+                Install the GitHub App
+                <span aria-hidden="true">↗</span>
+              </a>
+              <a class="text-link" href="#proof">See the failure it caught</a>
+            </div>
+          </div>
+
+          <div class="hero-film" data-reveal data-reveal-delay="1">
+            <video
+              class="hero-video"
+              muted
+              loop
+              playsinline
+              preload="metadata"
+              poster="/assets/robot-system-poster.jpg"
+              aria-hidden="true"
+              data-hero-video
+            >
+              <source src="/assets/robot-system.mp4" type="video/mp4" />
+            </video>
+            <div class="film-grid" aria-hidden="true"></div>
+            <p class="film-kicker">The machine keeps moving only if the system still works.</p>
+            <p class="film-note">Robot footage is illustrative</p>
+
+            <article class="live-check" aria-label="Fraeno robot integration check">
+              <div class="live-check-heading">
+                <div>
+                  <p class="micro-label">Fraeno check</p>
+                  <h2>Robot integration</h2>
+                </div>
+                <span class="blocked-pill">Blocked</span>
+              </div>
+              <div class="update-line">
+                <span>robot middleware</span>
+                <strong>1.0.1 <span aria-hidden="true">→</span> 2.0.0</strong>
+              </div>
+              <dl class="check-list">
+                <div>
+                  <dt>Code builds</dt>
+                  <dd class="passed">Passed</dd>
+                </div>
+                <div>
+                  <dt>Robot nodes start</dt>
+                  <dd class="passed">Passed</dd>
+                </div>
+                <div>
+                  <dt>Messages reach controller</dt>
+                  <dd class="failed">Failed</dd>
+                </div>
+                <div>
+                  <dt>Robot command output</dt>
+                  <dd class="failed">0 Hz</dd>
+                </div>
+              </dl>
+            </article>
           </div>
         </div>
 
-        <div class="hero-visual" data-reveal data-reveal-delay="1">
-          <img
-            src="/assets/robot-arm.jpg"
-            alt="A blue industrial robot arm working on a factory line"
-            width="1600"
-            height="1003"
-          />
-          <div class="hero-visual-wash" aria-hidden="true"></div>
-
-          <div class="story-bars" aria-hidden="true">
-            <span><i></i></span>
-            <span><i></i></span>
-          </div>
-
-          <div class="visual-caption">
-            <p>One dependency update</p>
-            <strong>One complete robot test</strong>
-          </div>
-
-          <article class="live-check" aria-label="Fraeno robot integration check">
-            <div class="live-check-heading">
-              <div>
-                <p class="micro-label">Fraeno check</p>
-                <h2>Robot integration</h2>
-              </div>
-              <span class="blocked-pill">Blocked</span>
-            </div>
-            <div class="update-line">
-              <span>robot middleware</span>
-              <strong>1.0.1 <span aria-hidden="true">→</span> 2.0.0</strong>
-            </div>
-            <dl class="check-list">
-              <div>
-                <dt>Code builds</dt>
-                <dd class="passed">Passed</dd>
-              </div>
-              <div>
-                <dt>Robot nodes start</dt>
-                <dd class="passed">Passed</dd>
-              </div>
-              <div>
-                <dt>Messages reach controller</dt>
-                <dd class="failed">Failed</dd>
-              </div>
-              <div>
-                <dt>Robot command output</dt>
-                <dd class="failed">0 Hz</dd>
-              </div>
-            </dl>
-          </article>
+        <div class="scroll-prompt" aria-hidden="true">
+          <span></span>
+          Scroll to follow the check
         </div>
 
         <div class="hero-proof" aria-label="Current Fraeno proof">
@@ -168,101 +168,94 @@
         </div>
       </section>
 
-      <section class="system-section" id="how-it-works">
-        <div class="section-heading section-shell" data-reveal>
+      <section class="run-section" id="how-it-works">
+        <div class="run-heading section-shell" data-reveal>
           <p class="section-label">How it works</p>
           <h2>
-            Fraeno tests the old system
-            <em>against the new one.</em>
+            The update runs
+            <em>before the robot takes the risk.</em>
           </h2>
-          <p>Every update becomes a controlled comparison before it can reach the robot.</p>
+          <p>Fraeno watches what changes in the complete running system.</p>
         </div>
 
-        <div class="system-stage section-shell">
-          <article class="system-card system-card-baseline" data-reveal>
-            <div class="system-card-top">
-              <span>Current system</span>
-              <strong>Healthy</strong>
+        <div class="run-experience section-shell">
+          <div class="run-stage-wrap" aria-hidden="true">
+            <div class="run-stage" data-run-stage data-phase="1">
+              <video
+                class="run-video"
+                muted
+                loop
+                playsinline
+                preload="metadata"
+                poster="/assets/robot-system-poster.jpg"
+                data-run-video
+              >
+                <source src="/assets/robot-system.mp4" type="video/mp4" />
+              </video>
+              <div class="run-stage-shade"></div>
+              <div class="run-readout">
+                <div class="run-readout-top">
+                  <span>Fraeno run</span>
+                  <strong data-run-status>Update found</strong>
+                </div>
+                <ol class="run-lines">
+                  <li data-run-line="1">
+                    <span>01</span>
+                    <strong>Open a focused update</strong>
+                    <i>ready</i>
+                  </li>
+                  <li data-run-line="2">
+                    <span>02</span>
+                    <strong>Build both systems</strong>
+                    <i>waiting</i>
+                  </li>
+                  <li data-run-line="3">
+                    <span>03</span>
+                    <strong>Compare live behavior</strong>
+                    <i>waiting</i>
+                  </li>
+                  <li data-run-line="4">
+                    <span>04</span>
+                    <strong>Report the result</strong>
+                    <i>waiting</i>
+                  </li>
+                </ol>
+                <div class="run-meter"><span data-run-meter></span></div>
+              </div>
             </div>
-            <div class="robot-map" aria-label="Healthy current robot system">
-              <div class="robot-node robot-node-main">
-                <span>Controller</span>
-                <small>receiving data</small>
-              </div>
-              <div class="robot-path robot-path-live" aria-hidden="true"><i></i></div>
-              <div class="robot-node">
-                <span>Sensor</span>
-                <small>20.6 Hz</small>
-              </div>
-              <div class="robot-path robot-path-live" aria-hidden="true"><i></i></div>
-              <div class="robot-node">
-                <span>Commands</span>
-                <small>20.6 Hz</small>
-              </div>
-            </div>
-            <p>The trusted version runs first and records the behavior that matters.</p>
-          </article>
-
-          <div class="system-connector" aria-hidden="true">
-            <span>compared with</span>
-            <i>→</i>
           </div>
 
-          <article class="system-card system-card-candidate" data-reveal data-reveal-delay="1">
-            <div class="system-card-top">
-              <span>Updated system</span>
-              <strong>Communication lost</strong>
-            </div>
-            <div class="robot-map" aria-label="Updated robot system with failed communication">
-              <div class="robot-node robot-node-main">
-                <span>Controller</span>
-                <small>waiting for data</small>
+          <ol class="run-steps">
+            <li class="run-step" data-run-step="1">
+              <span>01</span>
+              <div>
+                <h3>Fraeno finds one update</h3>
+                <p>It opens a focused pull request with one reversible change.</p>
               </div>
-              <div class="robot-path robot-path-broken" aria-hidden="true"><i></i></div>
-              <div class="robot-node">
-                <span>Sensor</span>
-                <small>still publishing</small>
+            </li>
+            <li class="run-step" data-run-step="2">
+              <span>02</span>
+              <div>
+                <h3>The trusted system runs first</h3>
+                <p>The current version records the behavior your robot is expected to keep.</p>
               </div>
-              <div class="robot-path robot-path-broken" aria-hidden="true"><i></i></div>
-              <div class="robot-node">
-                <span>Commands</span>
-                <small>0 Hz</small>
+            </li>
+            <li class="run-step" data-run-step="3">
+              <span>03</span>
+              <div>
+                <h3>The update runs the same test</h3>
+                <p>Fraeno compares nodes, messages, services, diagnostics, and rates.</p>
               </div>
-            </div>
-            <p>The new version builds, but the live comparison catches the broken message flow.</p>
-          </article>
+            </li>
+            <li class="run-step" data-run-step="4">
+              <span>04</span>
+              <div>
+                <h3>The pull request gets a clear answer</h3>
+                <p>The update passes or stops with the exact behavior that changed.</p>
+              </div>
+            </li>
+          </ol>
         </div>
-
-        <ol class="workflow-list section-shell" data-reveal>
-          <li>
-            <span>01</span>
-            <div>
-              <h3>Fraeno finds an update</h3>
-              <p>It opens a focused pull request with one reversible change.</p>
-            </div>
-          </li>
-          <li>
-            <span>02</span>
-            <div>
-              <h3>Both robot systems run</h3>
-              <p>The trusted version and the update start in clean, isolated environments.</p>
-            </div>
-          </li>
-          <li>
-            <span>03</span>
-            <div>
-              <h3>Real behavior is compared</h3>
-              <p>Fraeno checks the nodes, messages, services, diagnostics, and rates you declare.</p>
-            </div>
-          </li>
-          <li>
-            <span>04</span>
-            <div>
-              <h3>The pull request gets a clear answer</h3>
-              <p>The update passes or stops with the exact behavior that changed.</p>
-            </div>
-          </li>
-        </ol>
       </section>
 
       <section class="evidence-section" id="proof">
@@ -383,9 +376,7 @@
       <p>Robot updates tested before deployment.</p>
       <div class="footer-links">
         <a href="https://github.com/deepubuntu/fraeno">GitHub</a>
-        <a href="https://unsplash.com/photos/blue-industrial-robot-arm-in-factory-sz1CHL7Pky0">
-          Photo by Homa Appliances
-        </a>
+        <a href="https://github.com/apps/fraeno-robotics">Install</a>
       </div>
       <p>© 2026 Fraeno</p>
     </footer>
