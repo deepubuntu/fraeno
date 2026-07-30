@@ -64,11 +64,13 @@ def test_site_preserves_approved_product_copy() -> None:
     page = (SITE / "index.html").read_text()
 
     assert (
-        "Fraeno automatically manages and updates robot software dependencies, and tests the\n"
-        "            complete robotic system before changes are deployed."
+        "Fraeno updates the software inside robots, then tests that they still work."
     ) in page
     assert "essentially, dependabot for robots + integration testing." in page
-    assert "A passing result means the configured target and declared probes passed." in page
+    assert (
+        "A pass covers the behavior your team configures, not every possible robot behavior."
+        in page
+    )
 
 
 def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None:
@@ -79,33 +81,42 @@ def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None
 
     assert "color-scheme: light" in styles
     assert "prefers-reduced-motion" in styles
+    assert "--orange: #ff6b2c" in styles
+    assert "backdrop-filter: blur(24px)" in styles
+    assert "https://fonts." not in styles
+    assert "#071229" not in styles
     assert "—" not in visible_text
     assert ":" not in visible_text
     assert "A DeepUbuntu product" not in visible_text
+    assert "brand-mark" not in (SITE / "index.html").read_text()
 
 
 def test_site_shows_verified_external_proof_without_overclaiming() -> None:
     page = (SITE / "index.html").read_text()
 
-    assert "Passed in 1m 38s" in page
+    assert "20.6 Hz" in page
+    assert "0 Hz" in page
     assert (
         "https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
         in page
     )
-    assert "A design partner running Fraeno on a real robot repository" in page
-    assert "It does not\n          claim that every possible robot behavior is safe." in page
+    assert "Real production test" in page
+    assert (
+        "A pass covers the behavior your team configures, not every possible robot behavior."
+        in page
+    )
 
 
-def test_site_uses_local_robot_video_with_accessible_motion_fallbacks() -> None:
+def test_site_uses_product_motion_without_decorative_media() -> None:
     page = (SITE / "index.html").read_text()
     script = (SITE / "site.js").read_text()
     headers = (SITE / "_headers").read_text()
 
-    assert 'src="/assets/robot-system.mp4"' in page
-    assert 'poster="/assets/robot-system-poster.jpg"' in page
-    assert "muted" in page
-    assert "playsinline" in page
+    assert "<video" not in page
+    assert 'data-demo-state="baseline"' in page
+    assert 'data-demo-state="updated"' in page
+    assert "setDemoState" in script
+    assert "IntersectionObserver" in script
     assert "prefers-reduced-motion: reduce" in (SITE / "styles.css").read_text()
-    assert "video.pause()" in script
-    assert "media-src 'self'" in headers
-    assert "/assets/*" in headers
+    assert "media-src" not in headers
+    assert "/assets/*" not in headers
