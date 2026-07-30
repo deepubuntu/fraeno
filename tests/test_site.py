@@ -23,8 +23,12 @@ class SiteParser(HTMLParser):
             self._in_title = True
         if tag == "body":
             self._in_body = True
-        if tag in {"a", "link", "script", "img"}:
-            target = attributes.get("href") or attributes.get("src")
+        if tag in {"a", "link", "script", "img", "source", "video"}:
+            target = (
+                attributes.get("href")
+                or attributes.get("src")
+                or attributes.get("poster")
+            )
             if target is not None:
                 self.links.append(target)
         if tag == "link" and attributes.get("rel") == "canonical":
@@ -90,3 +94,18 @@ def test_site_shows_verified_external_proof_without_overclaiming() -> None:
     )
     assert "A design partner running Fraeno on a real robot repository" in page
     assert "It does not\n          claim that every possible robot behavior is safe." in page
+
+
+def test_site_uses_local_robot_video_with_accessible_motion_fallbacks() -> None:
+    page = (SITE / "index.html").read_text()
+    script = (SITE / "site.js").read_text()
+    headers = (SITE / "_headers").read_text()
+
+    assert 'src="/assets/robot-system.mp4"' in page
+    assert 'poster="/assets/robot-system-poster.jpg"' in page
+    assert "muted" in page
+    assert "playsinline" in page
+    assert "prefers-reduced-motion: reduce" in (SITE / "styles.css").read_text()
+    assert "video.pause()" in script
+    assert "media-src 'self'" in headers
+    assert "/assets/*" in headers
