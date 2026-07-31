@@ -144,6 +144,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
     assert "data-trace" in page
+    assert 'src="/site.js?v=c15a9a8a"' in page
     assert page.count("A bad update can make a robot move the wrong way") == 1
     assert page.count('data-proof-moment>') == 4
     assert "Fraeno catches software changes that make robots behave dangerously." in page
