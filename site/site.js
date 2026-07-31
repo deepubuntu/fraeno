@@ -5,6 +5,7 @@ const hero = document.querySelector("[data-hero]");
 const heroVideo = document.querySelector("[data-hero-video]");
 const proof = document.querySelector("[data-proof]");
 const sectionVideo = document.querySelector("[data-section-video]");
+const proofMoments = Array.from(document.querySelectorAll("[data-proof-moment]"));
 const revealItems = document.querySelectorAll("[data-reveal]");
 const methodSteps = document.querySelectorAll("[data-step]");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -29,6 +30,37 @@ const updateHero = () => {
   hero.style.setProperty("--hero-progress", progress.toFixed(3));
 };
 
+const updateProof = () => {
+  if (!proof || !proofMoments.length || reducedMotion.matches) {
+    return;
+  }
+
+  const bounds = proof.getBoundingClientRect();
+  const travel = Math.max(bounds.height - window.innerHeight, 1);
+  const progress = Math.min(Math.max(-bounds.top / travel, 0), 1);
+  const activeIndex = Math.min(Math.floor(progress / 0.2), proofMoments.length - 1);
+  const traceProgress = Math.min(Math.max((progress - 0.8) / 0.14, 0), 1);
+
+  proof.style.setProperty("--proof-progress", progress.toFixed(3));
+  proof.style.setProperty("--proof-brightness", (0.42 + progress * 0.07).toFixed(3));
+  proof.style.setProperty("--proof-shift-x", `${(-progress * 1.5).toFixed(3)}%`);
+  proof.style.setProperty("--proof-shift-y", `${(-progress).toFixed(3)}%`);
+  proof.style.setProperty("--proof-scale", (1.08 + progress * 0.025).toFixed(3));
+  proof.style.setProperty("--trace-progress", traceProgress.toFixed(3));
+  proof.style.setProperty("--trace-offset", `${((1 - traceProgress) * 1.25).toFixed(3)}rem`);
+  proof.style.setProperty(
+    "--proof-next-offset",
+    `${(proofMoments[activeIndex].getBoundingClientRect().height + 16).toFixed(1)}px`,
+  );
+  proof.dataset.activeMoment = String(activeIndex + 1);
+
+  proofMoments.forEach((moment, index) => {
+    moment.classList.toggle("is-active", index === activeIndex);
+    moment.classList.toggle("is-next", index === activeIndex + 1);
+    moment.classList.toggle("is-past", index < activeIndex);
+  });
+};
+
 let scrollFrame = 0;
 const onScroll = () => {
   updateHeader();
@@ -36,6 +68,7 @@ const onScroll = () => {
   if (!scrollFrame) {
     scrollFrame = window.requestAnimationFrame(() => {
       updateHero();
+      updateProof();
       scrollFrame = 0;
     });
   }
@@ -183,12 +216,25 @@ reducedMotion.addEventListener("change", () => {
     hero.style.setProperty("--pointer-y", "0px");
     hero.style.setProperty("--hero-progress", "0");
   }
+  if (reducedMotion.matches && proof) {
+    proof.style.setProperty("--proof-progress", "0");
+    proof.style.setProperty("--proof-brightness", "0.42");
+    proof.style.setProperty("--proof-shift-x", "0%");
+    proof.style.setProperty("--proof-shift-y", "0%");
+    proof.style.setProperty("--proof-scale", "1.08");
+    proof.style.setProperty("--proof-next-offset", "2.15em");
+    proof.style.setProperty("--trace-progress", "1");
+    proof.style.setProperty("--trace-offset", "0rem");
+  }
   configureHeroVideo();
   configureSectionVideo();
 });
 
 window.addEventListener("scroll", onScroll, { passive: true });
-window.addEventListener("resize", updateHero);
+window.addEventListener("resize", () => {
+  updateHero();
+  updateProof();
+});
 configureHeroVideo();
 configureSectionVideo();
 onScroll();
