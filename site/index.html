@@ -41,11 +41,14 @@
       <button
         class="menu-button"
         type="button"
+        aria-label="Toggle menu"
         aria-expanded="false"
         aria-controls="primary-navigation"
         data-menu-button
       >
-        Menu
+        <span></span>
+        <span></span>
+        <span></span>
       </button>
 
       <nav id="primary-navigation" aria-label="Primary navigation" data-navigation>
@@ -95,13 +98,28 @@
 
       <section class="system-intro section-shell" id="system">
         <p class="section-number" data-reveal>01</p>
-        <div data-reveal>
+        <div class="system-copy" data-reveal>
           <p class="section-label">One update, one answer</p>
           <h2>The build can pass while the robot fails.</h2>
         </div>
-        <p class="section-summary" data-reveal>
-          Fraeno runs the trusted system, runs the update, then compares the behavior that matters.
-        </p>
+        <div class="system-media" data-reveal>
+          <div class="system-film" aria-hidden="true">
+            <video
+              muted
+              loop
+              playsinline
+              preload="none"
+              poster="/assets/robot-system-poster.webp"
+              data-section-video
+            >
+              <source src="/assets/robot-system-loop.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <p class="section-summary">
+            Fraeno runs the trusted system, runs the update, then compares the behavior that
+            matters.
+          </p>
+        </div>
       </section>
 
       <section class="proof" id="proof" data-proof>
@@ -210,10 +228,31 @@
       </section>
     </main>
 
-    <footer class="site-footer section-shell">
-      <a class="wordmark" href="/" aria-label="Fraeno home">fraeno</a>
-      <a href="https://github.com/deepubuntu/fraeno">GitHub</a>
-      <p>© 2026 Fraeno</p>
+    <footer class="site-footer">
+      <div class="footer-glow" aria-hidden="true"></div>
+
+      <div class="footer-grid section-shell">
+        <div class="footer-about" data-reveal>
+          <a class="wordmark" href="/" aria-label="Fraeno home">fraeno</a>
+          <p>Robot software updates, tested as complete systems before deployment.</p>
+          <small>© 2026 Fraeno</small>
+        </div>
+
+        <nav class="footer-nav" aria-label="Footer navigation" data-reveal>
+          <div>
+            <span>Explore</span>
+            <a href="#system">System test</a>
+            <a href="#proof">Proof</a>
+          </div>
+          <div>
+            <span>Get started</span>
+            <a href="https://github.com/apps/fraeno-robotics">Install Fraeno</a>
+            <a href="https://github.com/deepubuntu/fraeno">GitHub</a>
+          </div>
+        </nav>
+      </div>
+
+      <div class="footer-word" aria-hidden="true" data-reveal>fraeno</div>
     </footer>
   </body>
 </html>

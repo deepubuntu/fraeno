@@ -115,12 +115,16 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     script = (SITE / "site.js").read_text()
     headers = (SITE / "_headers").read_text()
 
-    assert "<video" not in page
+    assert '<video\n              muted\n              loop\n              playsinline' in page
+    assert 'poster="/assets/robot-system-poster.webp"' in page
+    assert 'src="/assets/robot-system-loop.mp4"' in page
+    assert "data-section-video" in page
     assert 'src="/assets/fraeno-robot-arm.webp"' in page
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
     assert "data-trace" in page
     assert "IntersectionObserver" in script
+    assert "configureSectionVideo" in script
     assert "requestAnimationFrame" in script
     assert "prefers-reduced-motion: reduce" in (SITE / "styles.css").read_text()
     assert "media-src" not in headers
@@ -128,12 +132,31 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert "/assets/*" in headers
 
 
+def test_site_adapts_the_reference_navigation_and_footer_without_extra_copy() -> None:
+    page = (SITE / "index.html").read_text()
+    styles = (SITE / "styles.css").read_text()
+
+    assert 'class="menu-button"' in page
+    assert 'class="footer-grid section-shell"' in page
+    assert 'class="footer-word"' in page
+    assert 'class="footer-nav"' in page
+    assert "backdrop-filter: blur(24px)" in styles
+    assert "radial-gradient(" in styles
+    assert "font-size: clamp(11rem, 31vw, 32rem)" in styles
+
+
 def test_site_bundles_original_visual_and_self_hosted_font() -> None:
     robot = SITE / "assets" / "fraeno-robot-arm.webp"
     font = SITE / "assets" / "inter-tight-latin.woff2"
     license_file = SITE / "assets" / "INTER-TIGHT-OFL.txt"
+    system_video = SITE / "assets" / "robot-system-loop.mp4"
+    system_poster = SITE / "assets" / "robot-system-poster.webp"
 
     assert robot.is_file()
     assert robot.stat().st_size < 100_000
     assert font.is_file()
     assert license_file.is_file()
+    assert system_video.is_file()
+    assert system_video.stat().st_size < 500_000
+    assert system_poster.is_file()
+    assert system_poster.stat().st_size < 50_000
