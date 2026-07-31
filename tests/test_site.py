@@ -81,9 +81,12 @@ def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None
 
     assert "color-scheme: light" in styles
     assert "prefers-reduced-motion" in styles
-    assert "--orange: #ff6b2c" in styles
-    assert "backdrop-filter: blur(24px)" in styles
+    assert '--font: "Inter Tight"' in styles
+    assert "font-weight: 420" in styles
+    assert "--orange: #ff6333" in styles
+    assert "backdrop-filter: blur(20px)" in styles
     assert "https://fonts." not in styles
+    assert "8.5rem" not in styles
     assert "#071229" not in styles
     assert "—" not in visible_text
     assert ":" not in visible_text
@@ -100,7 +103,7 @@ def test_site_shows_verified_external_proof_without_overclaiming() -> None:
         "https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
         in page
     )
-    assert "Real production test" in page
+    assert "Production test" in page
     assert (
         "A pass covers the behavior your team configures, not every possible robot behavior."
         in page
@@ -113,10 +116,24 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     headers = (SITE / "_headers").read_text()
 
     assert "<video" not in page
-    assert 'data-demo-state="baseline"' in page
-    assert 'data-demo-state="updated"' in page
-    assert "setDemoState" in script
+    assert 'src="/assets/fraeno-robot-arm.webp"' in page
+    assert 'href="/assets/inter-tight-latin.woff2"' in page
+    assert "data-hero-visual" in page
+    assert "data-trace" in page
     assert "IntersectionObserver" in script
+    assert "requestAnimationFrame" in script
     assert "prefers-reduced-motion: reduce" in (SITE / "styles.css").read_text()
     assert "media-src" not in headers
-    assert "/assets/*" not in headers
+    assert "font-src 'self'" in headers
+    assert "/assets/*" in headers
+
+
+def test_site_bundles_original_visual_and_self_hosted_font() -> None:
+    robot = SITE / "assets" / "fraeno-robot-arm.webp"
+    font = SITE / "assets" / "inter-tight-latin.woff2"
+    license_file = SITE / "assets" / "INTER-TIGHT-OFL.txt"
+
+    assert robot.is_file()
+    assert robot.stat().st_size < 100_000
+    assert font.is_file()
+    assert license_file.is_file()

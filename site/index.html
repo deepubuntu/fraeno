@@ -10,13 +10,24 @@
     />
     <link rel="canonical" href="https://fraeno.com/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <meta name="theme-color" content="#fbfaf7" />
+    <link
+      rel="preload"
+      href="/assets/inter-tight-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/assets/fraeno-robot-arm.webp"
+      as="image"
+      type="image/webp"
+      fetchpriority="high"
+    />
+    <meta name="theme-color" content="#d8d7d3" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Fraeno" />
-    <meta
-      property="og:description"
-      content="Robot software updates tested before deployment."
-    />
+    <meta property="og:description" content="Robot updates tested before deployment." />
     <meta property="og:url" content="https://fraeno.com/" />
     <link rel="stylesheet" href="/styles.css" />
     <script src="/site.js" defer></script>
@@ -38,164 +49,164 @@
       </button>
 
       <nav id="primary-navigation" aria-label="Primary navigation" data-navigation>
-        <a href="#product">Product</a>
+        <a href="#system">System test</a>
         <a href="#proof">Proof</a>
-        <a class="nav-action" href="https://github.com/apps/fraeno-robotics">Install Fraeno</a>
+        <a class="nav-action" href="https://github.com/apps/fraeno-robotics">
+          Install Fraeno
+        </a>
       </nav>
     </header>
 
     <main id="main">
-      <section class="hero">
-        <div class="hero-glow" aria-hidden="true"></div>
-        <div class="hero-copy">
-          <h1 data-hero-line>
-            Update the robot.
-            <span>Keep it working.</span>
-          </h1>
-          <p class="hero-summary" data-hero-line>
-            Fraeno updates the software inside robots, then tests that they still work.
-          </p>
-          <p class="plain-language" data-hero-line>
-            <em>essentially, dependabot for robots + integration testing.</em>
-          </p>
-          <div class="hero-actions" data-hero-line>
-            <a class="button button-primary" href="https://github.com/apps/fraeno-robotics">
-              Install Fraeno
+      <section class="hero" data-hero>
+        <div class="hero-visual" data-hero-visual aria-hidden="true">
+          <img src="/assets/fraeno-robot-arm.webp" alt="" width="1536" height="1024" />
+        </div>
+
+        <div class="hero-grid section-shell">
+          <div class="hero-heading">
+            <p class="eyebrow" data-hero-item>Robot software updates</p>
+            <h1>
+              <span class="hero-line"><span data-hero-item>Update the software.</span></span>
+              <span class="hero-line"><span data-hero-item>Keep the robot working.</span></span>
+            </h1>
+          </div>
+
+          <div class="hero-aside" data-hero-item>
+            <p>Fraeno updates the software inside robots, then tests that they still work.</p>
+            <p class="plain-language">
+              <em>essentially, dependabot for robots + integration testing.</em>
+            </p>
+            <a class="round-link" href="#system">
+              <span>See the system test</span>
+              <i aria-hidden="true">→</i>
             </a>
-            <a class="button button-quiet" href="#proof">See the proof</a>
           </div>
         </div>
-      </section>
 
-      <section class="product-section" id="product">
-        <div class="product-intro section-shell" data-reveal>
-          <p>One update. One complete system test.</p>
-        </div>
+        <div class="hero-word" aria-hidden="true">fraeno</div>
 
-        <div class="product-wrap section-shell" data-demo-wrap>
-          <article class="product-demo" data-product-demo data-state="updated">
-            <header class="product-bar">
-              <div>
-                <span class="product-dot" aria-hidden="true"></span>
-                <strong>Fraeno check</strong>
-              </div>
-              <div class="state-switch" aria-label="Robot system version">
-                <button type="button" data-demo-state="baseline">Before</button>
-                <button type="button" class="is-selected" data-demo-state="updated">After</button>
-              </div>
-            </header>
-
-            <div class="product-body">
-              <div class="product-status">
-                <p>Complete system</p>
-                <h2 data-demo-title>Messages stopped at the controller.</h2>
-                <p data-demo-detail>The update built. The robot did not behave like before.</p>
-              </div>
-
-              <div class="system-view" aria-label="Robot system behavior comparison">
-                <div class="system-node">
-                  <span>Sensor</span>
-                  <strong data-sensor-rate>20.6 Hz</strong>
-                </div>
-                <div class="system-link" data-system-link="sensor" aria-hidden="true">
-                  <span></span>
-                </div>
-                <div class="system-node system-node-main">
-                  <span>Controller</span>
-                  <strong data-controller-rate>No messages</strong>
-                </div>
-                <div class="system-link" data-system-link="command" aria-hidden="true">
-                  <span></span>
-                </div>
-                <div class="system-node">
-                  <span>Commands</span>
-                  <strong data-command-rate>0 Hz</strong>
-                </div>
-              </div>
-            </div>
-
-            <footer class="product-result">
-              <span>Fraeno decision</span>
-              <strong data-demo-decision>Blocked before deployment</strong>
-            </footer>
-          </article>
+        <div class="hero-footer section-shell" data-hero-item>
+          <span>Complete-system testing</span>
+          <span>Built for ROS 2</span>
+          <span>Illustrative hardware</span>
         </div>
       </section>
 
-      <section class="statement section-shell" data-reveal>
-        <h2>A green build is not a working robot.</h2>
-        <p>Fraeno runs the complete system and compares the behavior that matters.</p>
+      <section class="system-intro section-shell" id="system">
+        <p class="section-number" data-reveal>01</p>
+        <div data-reveal>
+          <p class="section-label">One update, one answer</p>
+          <h2>The build can pass while the robot fails.</h2>
+        </div>
+        <p class="section-summary" data-reveal>
+          Fraeno runs the trusted system, runs the update, then compares the behavior that matters.
+        </p>
       </section>
 
-      <section class="flow section-shell" aria-label="How Fraeno works">
-        <ol>
-          <li data-flow-step>
-            <span>01</span>
-            <strong>Find the update</strong>
-          </li>
-          <li data-flow-step>
-            <span>02</span>
-            <strong>Run the trusted system</strong>
-          </li>
-          <li data-flow-step>
-            <span>03</span>
-            <strong>Run the new system</strong>
-          </li>
-          <li data-flow-step>
-            <span>04</span>
-            <strong>Compare the behavior</strong>
-          </li>
-        </ol>
-      </section>
+      <section class="proof" id="proof" data-proof>
+        <div class="proof-image" aria-hidden="true">
+          <img
+            src="/assets/fraeno-robot-arm.webp"
+            alt=""
+            width="1536"
+            height="1024"
+            loading="lazy"
+          />
+        </div>
 
-      <section class="proof-section" id="proof">
         <div class="proof-inner section-shell">
-          <div class="proof-copy" data-reveal>
-            <p>Real production test</p>
+          <div class="proof-heading" data-reveal>
+            <p>Production test</p>
             <h2>
               It built.
               <span>Then messages stopped.</span>
             </h2>
           </div>
 
-          <div class="proof-numbers" data-reveal>
-            <div>
-              <span>Before</span>
+          <div class="trace" aria-label="Robot message path after the update" data-trace>
+            <div class="trace-node">
+              <span>Sensor</span>
               <strong>20.6 Hz</strong>
             </div>
-            <div>
-              <span>After</span>
+            <div class="trace-line trace-line-live" aria-hidden="true"><span></span></div>
+            <div class="trace-node">
+              <span>Controller</span>
+              <strong>No messages</strong>
+            </div>
+            <div class="trace-line trace-line-broken" aria-hidden="true"></div>
+            <div class="trace-node">
+              <span>Commands</span>
               <strong>0 Hz</strong>
             </div>
           </div>
 
-          <a
-            class="proof-link"
-            href="https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
-          >
-            View the run
-          </a>
+          <div class="proof-footer" data-reveal>
+            <div>
+              <span>Fraeno decision</span>
+              <strong>Blocked before deployment</strong>
+            </div>
+            <a
+              href="https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
+            >
+              View the run
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
         </div>
       </section>
 
-      <section class="scope section-shell" id="scope" data-reveal>
-        <p>Available now for</p>
-        <div>
+      <section class="method section-shell" aria-labelledby="method-title">
+        <header data-reveal>
+          <p class="section-number">02</p>
+          <div>
+            <p class="section-label">How it works</p>
+            <h2 id="method-title">The complete system, before deployment.</h2>
+          </div>
+        </header>
+
+        <ol class="method-steps">
+          <li data-step>
+            <span>01</span>
+            <strong>Find the update</strong>
+          </li>
+          <li data-step>
+            <span>02</span>
+            <strong>Run the trusted system</strong>
+          </li>
+          <li data-step>
+            <span>03</span>
+            <strong>Run the new system</strong>
+          </li>
+          <li data-step>
+            <span>04</span>
+            <strong>Compare behavior</strong>
+          </li>
+        </ol>
+      </section>
+
+      <section class="availability section-shell" data-reveal>
+        <p>Available now</p>
+        <div class="availability-list">
           <span>ROS 2 Humble</span>
           <span>Ubuntu 22.04</span>
           <span>amd64</span>
-          <span>GitHub App live</span>
+          <span>GitHub App</span>
         </div>
         <small>
           A pass covers the behavior your team configures, not every possible robot behavior.
         </small>
       </section>
 
-      <section class="closing section-shell" data-reveal>
-        <h2>Test the next update before your robot does.</h2>
-        <a class="button button-primary" href="https://github.com/apps/fraeno-robotics">
-          Install Fraeno
-        </a>
+      <section class="closing">
+        <div class="closing-inner section-shell" data-reveal>
+          <p>Fraeno</p>
+          <h2>Test the update before the robot does.</h2>
+          <a class="install-link" href="https://github.com/apps/fraeno-robotics">
+            Install Fraeno
+            <span aria-hidden="true">→</span>
+          </a>
+        </div>
       </section>
     </main>
 
