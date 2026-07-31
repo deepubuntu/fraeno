@@ -174,7 +174,7 @@
         </div>
       </section>
 
-      <section class="method section-shell" aria-labelledby="method-title">
+      <section class="method section-shell" id="method" aria-labelledby="method-title">
         <header data-reveal>
           <p class="section-number">02</p>
           <div>
@@ -203,7 +203,7 @@
         </ol>
       </section>
 
-      <section class="availability section-shell" data-reveal>
+      <section class="availability section-shell" id="coverage" data-reveal>
         <p>Available now</p>
         <div class="availability-list">
           <span>ROS 2 Humble</span>
@@ -228,13 +228,16 @@
       </section>
     </main>
 
-    <footer class="site-footer">
+    <footer class="site-footer" id="footer">
       <div class="footer-glow" aria-hidden="true"></div>
 
-      <div class="footer-grid section-shell">
+      <div class="footer-main">
         <div class="footer-about" data-reveal>
           <a class="wordmark" href="/" aria-label="Fraeno home">fraeno</a>
-          <p>Robot software updates, tested as complete systems before deployment.</p>
+          <p>Fraeno updates the software inside robots, then tests that they still work.</p>
+          <p class="footer-note">
+            <em>essentially, dependabot for robots + integration testing.</em>
+          </p>
           <small>© 2026 Fraeno</small>
         </div>
 
@@ -245,6 +248,11 @@
             <a href="#proof">Proof</a>
           </div>
           <div>
+            <span>Product</span>
+            <a href="#method">How it works</a>
+            <a href="#coverage">What it checks</a>
+          </div>
+          <div>
             <span>Get started</span>
             <a href="https://github.com/apps/fraeno-robotics">Install Fraeno</a>
             <a href="https://github.com/deepubuntu/fraeno">GitHub</a>
@@ -252,7 +260,11 @@
         </nav>
       </div>
 
-      <div class="footer-word" aria-hidden="true" data-reveal>fraeno</div>
+      <div class="footer-word" aria-hidden="true">
+        <svg viewBox="0 0 1000 230" preserveAspectRatio="none" role="presentation">
+          <text x="0" y="225" textLength="1000" lengthAdjust="spacingAndGlyphs">fraeno</text>
+        </svg>
+      </div>
     </footer>
   </body>
 </html>
