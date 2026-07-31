@@ -77,6 +77,7 @@ def test_site_preserves_approved_product_copy() -> None:
         "A bad update can make a robot move the wrong way, fail to stop, or become dangerous"
     ) in page
     assert "Fraeno catches software changes that make robots behave dangerously." in page
+    assert "An update can look harmless while the robot becomes dangerous." not in page
     assert "© 2026 DeepUbuntu Labs" in page
 
 
@@ -143,8 +144,13 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
     assert "data-trace" in page
+    assert page.count("A bad update can make a robot move the wrong way") == 1
+    assert page.count('data-proof-moment>') == 4
     assert "Fraeno catches software changes that make robots behave dangerously." in page
     assert "IntersectionObserver" in script
+    assert "updateProof" in script
+    assert 'proof.dataset.activeMoment = String(activeIndex + 1)' in script
+    assert '--trace-progress' in (SITE / "styles.css").read_text()
     assert "configureSectionVideo" in script
     assert "configureHeroVideo" in script
     hero_tag = re.search(r"<video\s+(.*?)data-hero-video\s*>", page, re.DOTALL)
@@ -226,7 +232,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
-    assert 'href="/styles.css?v=fd9c5bc3"' in page
+    assert 'href="/styles.css?v=d9cd5692"' in page
     assert ".hero-support .round-link" in styles
     assert "padding-top: clamp(9.25rem, 17vh, 11.5rem)" in styles
     assert "padding-top: 9rem" in styles
@@ -235,6 +241,33 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     assert "text-align: center" in tablet_footer
     assert ".footer-nav > div" in tablet_footer
     assert "align-items: center" in tablet_footer
+
+
+def test_site_pins_the_four_step_security_story_and_keeps_a_static_fallback() -> None:
+    page = (SITE / "index.html").read_text()
+    styles = (SITE / "styles.css").read_text()
+    script = (SITE / "site.js").read_text()
+    reduced_motion = styles.split("@media (prefers-reduced-motion: reduce)", 1)[1]
+
+    for moment in (
+        "Fraeno is the security gate",
+        "between a software update and the robot.",
+        "It catches changes",
+        "that make the robot behave dangerously.",
+    ):
+        assert moment in page
+
+    assert "height: 360svh" in styles
+    assert ".proof-stage" in styles
+    assert "position: sticky" in styles
+    assert ".proof-moment.is-active" in styles
+    assert ".proof-moment.is-next" in styles
+    assert "const activeIndex = Math.min(Math.floor(progress / 0.2)" in script
+    assert "const traceProgress = Math.min(Math.max((progress - 0.8) / 0.14" in script
+    assert "height: auto" in reduced_motion
+    assert "position: static" in reduced_motion
+    assert ".proof-result" in reduced_motion
+    assert "opacity: 1" in reduced_motion
 
 
 def test_site_bundles_original_visual_and_self_hosted_font() -> None:

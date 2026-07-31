@@ -71,7 +71,7 @@
         "description": "Fraeno catches software changes that make robots behave dangerously."
       }
     </script>
-    <link rel="stylesheet" href="/styles.css?v=fd9c5bc3" />
+    <link rel="stylesheet" href="/styles.css?v=d9cd5692" />
     <script src="/site.js" defer></script>
   </head>
   <body>
@@ -157,7 +157,10 @@
         <p class="section-number" data-reveal>01</p>
         <div class="system-copy" data-reveal>
           <p class="section-label">Why it matters</p>
-          <h2>An update can look harmless while the robot becomes dangerous.</h2>
+          <h2>
+            A bad update can make a robot move the wrong way, fail to stop, or become dangerous
+            to people. Fraeno catches software changes that make robots behave dangerously.
+          </h2>
         </div>
         <div class="system-media" data-reveal>
           <div class="system-film" aria-hidden="true">
@@ -173,65 +176,76 @@
               <source src="/assets/robot-system-loop.mp4?v=e7e40370" type="video/mp4" />
             </video>
           </div>
-          <p class="section-summary">
-            A bad update can make a robot move the wrong way, fail to stop, or become dangerous
-            to people. Fraeno catches software changes that make robots behave dangerously.
-          </p>
         </div>
       </section>
 
       <section class="proof" id="method" data-proof>
-        <div class="proof-image" aria-hidden="true">
-          <img
-            src="/assets/fraeno-robot-arm.webp"
-            alt=""
-            width="1536"
-            height="1024"
-            loading="lazy"
-          />
-        </div>
-
-        <div class="proof-inner section-shell">
-          <div class="proof-heading" data-reveal>
-            <p>How it works</p>
-            <h2>
-              Fraeno is the security gate between a software update and the robot.
-              <span>It catches changes that make the robot behave dangerously.</span>
-            </h2>
+        <div class="proof-stage">
+          <div class="proof-image" aria-hidden="true">
+            <img
+              src="/assets/fraeno-robot-arm.webp"
+              alt=""
+              width="1536"
+              height="1024"
+              loading="lazy"
+            />
           </div>
 
-          <div
-            class="trace"
-            aria-label="A dangerous update that Fraeno caught"
-            data-trace
-          >
-            <div class="trace-node">
-              <span>Sensor</span>
-              <strong>Sent information</strong>
+          <div class="proof-inner section-shell">
+            <div class="proof-heading" data-reveal>
+              <p>How it works</p>
+              <h2
+                class="proof-moments"
+                aria-label="Fraeno is the security gate between a software update and the robot. It catches changes that make the robot behave dangerously."
+              >
+                <span class="proof-moment is-active" data-proof-moment>
+                  Fraeno is the security gate
+                </span>
+                <span class="proof-moment is-next" data-proof-moment>
+                  between a software update and the robot.
+                </span>
+                <span class="proof-moment" data-proof-moment>It catches changes</span>
+                <span class="proof-moment" data-proof-moment>
+                  that make the robot behave dangerously.
+                </span>
+              </h2>
             </div>
-            <div class="trace-line trace-line-live" aria-hidden="true"><span></span></div>
-            <div class="trace-node">
-              <span>Robot</span>
-              <strong>Heard nothing</strong>
-            </div>
-            <div class="trace-line trace-line-broken" aria-hidden="true"></div>
-            <div class="trace-node">
-              <span>Movement</span>
-              <strong>Stopped</strong>
-            </div>
-          </div>
 
-          <div class="proof-footer" data-reveal>
-            <div>
-              <span>Fraeno caught the problem</span>
-              <strong>Update blocked</strong>
+            <div class="proof-result">
+              <div
+                class="trace"
+                aria-label="A dangerous update that Fraeno caught"
+                data-trace
+              >
+                <div class="trace-node">
+                  <span>Sensor</span>
+                  <strong>Sent information</strong>
+                </div>
+                <div class="trace-line trace-line-live" aria-hidden="true"><span></span></div>
+                <div class="trace-node">
+                  <span>Robot</span>
+                  <strong>Heard nothing</strong>
+                </div>
+                <div class="trace-line trace-line-broken" aria-hidden="true"></div>
+                <div class="trace-node">
+                  <span>Movement</span>
+                  <strong>Stopped</strong>
+                </div>
+              </div>
+
+              <div class="proof-footer">
+                <div>
+                  <span>Fraeno caught the problem</span>
+                  <strong>Update blocked</strong>
+                </div>
+                <a
+                  href="https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
+                >
+                  See the real run
+                  <span aria-hidden="true">↗</span>
+                </a>
+              </div>
             </div>
-            <a
-              href="https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
-            >
-              See the real run
-              <span aria-hidden="true">↗</span>
-            </a>
           </div>
         </div>
       </section>

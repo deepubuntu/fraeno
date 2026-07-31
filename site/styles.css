@@ -406,7 +406,10 @@ h1 {
 }
 
 .system-intro h2 {
-  max-width: 12ch;
+  max-width: 20ch;
+  font-size: clamp(2rem, 3vw, 3.55rem);
+  letter-spacing: -0.055em;
+  line-height: 0.98;
 }
 
 .system-media {
@@ -439,19 +442,27 @@ h1 {
   object-fit: cover;
 }
 
-.section-summary {
-  max-width: 28rem;
-  margin: 1.5rem 0 0;
-  color: var(--muted);
-  font-size: 0.88rem;
-}
-
 .proof {
+  --proof-progress: 0;
+  --proof-brightness: 0.42;
+  --proof-shift-x: 0%;
+  --proof-shift-y: 0%;
+  --proof-scale: 1.08;
+  --proof-next-offset: 2.15em;
+  --trace-progress: 0;
+  --trace-offset: 1.25rem;
   position: relative;
-  min-height: 56rem;
-  overflow: hidden;
+  height: 360svh;
   background: var(--black);
   color: var(--white);
+  isolation: isolate;
+}
+
+.proof-stage {
+  position: sticky;
+  top: 0;
+  min-height: max(44rem, 100svh);
+  overflow: hidden;
   isolation: isolate;
 }
 
@@ -476,17 +487,21 @@ h1 {
   height: 100%;
   object-fit: cover;
   object-position: 60% 52%;
-  filter: grayscale(1) brightness(0.42) contrast(1.35);
-  transform: scale(1.08);
+  filter: grayscale(1) brightness(var(--proof-brightness)) contrast(1.35);
+  transform:
+    translate3d(var(--proof-shift-x), var(--proof-shift-y), 0)
+    scale(var(--proof-scale));
+  transition: filter 180ms linear;
+  will-change: filter, transform;
 }
 
 .proof-inner {
   display: grid;
-  min-height: 56rem;
+  min-height: max(44rem, 100svh);
   padding-top: 7rem;
   padding-bottom: 3rem;
-  grid-template-rows: 1fr auto auto;
-  gap: 4rem;
+  grid-template-rows: 1fr auto;
+  gap: 2.5rem;
 }
 
 .proof-heading > p {
@@ -498,7 +513,6 @@ h1 {
 }
 
 .proof-heading h2 {
-  max-width: 9ch;
   margin: 0;
   font-size: clamp(3.5rem, 7vw, 7.5rem);
   font-weight: 390;
@@ -506,9 +520,48 @@ h1 {
   line-height: 0.88;
 }
 
-.proof-heading h2 span {
+.proof-moments {
+  position: relative;
+  min-height: clamp(15rem, 39vh, 26rem);
+  overflow: visible;
+}
+
+.proof-moment {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
-  color: rgba(255, 255, 255, 0.3);
+  max-width: 9ch;
+  color: var(--white);
+  opacity: 0;
+  transform: translateY(0.5em);
+  transition:
+    opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.proof-moment.is-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.proof-moment.is-next {
+  opacity: 0.18;
+  transform: translateY(var(--proof-next-offset));
+}
+
+.proof-moment.is-past {
+  transform: translateY(-0.45em);
+}
+
+.proof-result {
+  opacity: var(--trace-progress);
+  transform: translateY(var(--trace-offset));
+  transition:
+    opacity 120ms linear,
+    transform 120ms linear;
+  will-change: opacity, transform;
 }
 
 .trace {
@@ -575,6 +628,7 @@ h1 {
   align-items: end;
   justify-content: space-between;
   gap: 2rem;
+  margin-top: 1.35rem;
 }
 
 .proof-footer strong {
@@ -1194,9 +1248,9 @@ h1 {
     font-size: clamp(3rem, 13vw, 4.4rem);
   }
 
-  .section-summary {
-    max-width: 26rem;
-    margin-top: 1.25rem;
+  .system-intro h2 {
+    max-width: 18ch;
+    font-size: clamp(2.05rem, 8.5vw, 3rem);
   }
 
   .system-media {
@@ -1208,9 +1262,18 @@ h1 {
     border-radius: 1rem;
   }
 
-  .proof,
+  .proof {
+    min-height: 0;
+  }
+
+  .proof-stage {
+    height: 100svh;
+    min-height: 0;
+  }
+
   .proof-inner {
-    min-height: 54rem;
+    height: 100%;
+    min-height: 0;
   }
 
   .proof-image {
@@ -1226,8 +1289,8 @@ h1 {
 
   .proof-inner {
     padding-top: 5rem;
-    padding-bottom: 2rem;
-    gap: 2.5rem;
+    padding-bottom: 1.25rem;
+    gap: 1.25rem;
   }
 
   .proof-heading h2 {
@@ -1235,12 +1298,13 @@ h1 {
   }
 
   .trace {
+    padding: 0.8rem 0;
     grid-template-columns: 1fr;
   }
 
   .trace-line {
     width: 1px;
-    height: 2rem;
+    height: 1.2rem;
     margin-left: 0.3rem;
   }
 
@@ -1270,7 +1334,8 @@ h1 {
   }
 
   .proof-footer {
-    display: grid;
+    display: flex;
+    margin-top: 0.8rem;
   }
 
   .proof-footer a {
@@ -1407,6 +1472,39 @@ h1 {
   .hero-visual,
   .hero-word {
     transform: none;
+  }
+
+  .proof {
+    height: auto;
+  }
+
+  .proof-stage {
+    position: relative;
+  }
+
+  .proof-inner {
+    min-height: 56rem;
+  }
+
+  .proof-moments {
+    min-height: 0;
+  }
+
+  .proof-moment {
+    position: static;
+    margin-bottom: 0.12em;
+    opacity: 1;
+    transform: none;
+  }
+
+  .proof-result {
+    opacity: 1;
+    transform: none;
+  }
+
+  .proof-image img {
+    filter: grayscale(1) brightness(0.42) contrast(1.35);
+    transform: scale(1.08);
   }
 
   .hero-visual video {
