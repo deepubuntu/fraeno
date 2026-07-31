@@ -1,7 +1,7 @@
 {
   "name": "Fraeno",
   "short_name": "Fraeno",
-  "description": "Fraeno updates the software inside robots, then tests that they still work.",
+  "description": "Catch dangerous changes in robot behavior before software reaches the real robot.",
   "start_url": "/",
   "display": "browser",
   "background_color": "#d8d7d3",

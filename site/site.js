@@ -2,6 +2,7 @@ const header = document.querySelector("[data-header]");
 const menuButton = document.querySelector("[data-menu-button]");
 const navigation = document.querySelector("[data-navigation]");
 const hero = document.querySelector("[data-hero]");
+const heroVideo = document.querySelector("[data-hero-video]");
 const proof = document.querySelector("[data-proof]");
 const sectionVideo = document.querySelector("[data-section-video]");
 const revealItems = document.querySelectorAll("[data-reveal]");
@@ -124,6 +125,20 @@ if (reducedMotion.matches || !("IntersectionObserver" in window)) {
 
 let videoObserver;
 
+const configureHeroVideo = () => {
+  if (!heroVideo) {
+    return;
+  }
+
+  if (reducedMotion.matches) {
+    heroVideo.pause();
+    heroVideo.currentTime = 0;
+    return;
+  }
+
+  heroVideo.play().catch(() => {});
+};
+
 const configureSectionVideo = () => {
   videoObserver?.disconnect();
 
@@ -163,10 +178,12 @@ reducedMotion.addEventListener("change", () => {
     hero.style.setProperty("--pointer-y", "0px");
     hero.style.setProperty("--hero-progress", "0");
   }
+  configureHeroVideo();
   configureSectionVideo();
 });
 
 window.addEventListener("scroll", onScroll, { passive: true });
 window.addEventListener("resize", updateHero);
+configureHeroVideo();
 configureSectionVideo();
 onScroll();
