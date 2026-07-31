@@ -74,7 +74,7 @@ def test_site_preserves_approved_product_copy() -> None:
     ) in page
     assert "essentially, dependabot for robots + integration testing." in page
     assert (
-        "A pass covers the behavior your team configures, not every possible robot behavior."
+        "A pass means the robot checks you chose worked. It does not promise that every possible"
         in page
     )
 
@@ -103,15 +103,18 @@ def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None
 def test_site_shows_verified_external_proof_without_overclaiming() -> None:
     page = (SITE / "index.html").read_text()
 
-    assert "20.6 Hz" in page
-    assert "0 Hz" in page
+    assert "Sent 20.6 readings each second" in page
+    assert "Robot controller" in page
+    assert "Received nothing" in page
+    assert "Movement commands" in page
+    assert "Stopped" in page
     assert (
         "https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
         in page
     )
     assert "Production test" in page
     assert (
-        "A pass covers the behavior your team configures, not every possible robot behavior."
+        "A pass means the robot checks you chose worked. It does not promise that every possible"
         in page
     )
 
@@ -121,7 +124,14 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     script = (SITE / "site.js").read_text()
     headers = (SITE / "_headers").read_text()
 
-    assert '<video\n              muted\n              loop\n              playsinline' in page
+    video_markup = (
+        "<video\n"
+        "              autoplay\n"
+        "              muted\n"
+        "              loop\n"
+        "              playsinline"
+    )
+    assert video_markup in page
     assert 'poster="/assets/robot-system-poster.webp?v=22eddc0b"' in page
     assert 'src="/assets/robot-system-loop.mp4?v=e7e40370"' in page
     assert "data-section-video" in page
@@ -129,6 +139,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
     assert "data-trace" in page
+    assert "the robot can still do the same jobs" in page
     assert "IntersectionObserver" in script
     assert "configureSectionVideo" in script
     assert "requestAnimationFrame" in script
@@ -153,6 +164,34 @@ def test_site_adapts_the_reference_navigation_and_complete_footer() -> None:
     assert "radial-gradient(" in styles
     assert "grid-template-columns: repeat(3, minmax(8rem, 1fr))" in styles
     assert ".footer-word text" in styles
+
+
+def test_site_keeps_the_full_plain_language_method_illustration() -> None:
+    page = (SITE / "index.html").read_text()
+    styles = (SITE / "styles.css").read_text()
+
+    assert '<section class="method section-shell" id="method"' in page
+    assert "Test the whole robot before the update goes live." in page
+    assert "Find one update" in page
+    assert "Watch the robot work now" in page
+    assert "Try the updated software" in page
+    assert "Check that the robot still works" in page
+    assert "minmax(26rem, 1.28fr)" in styles
+
+
+def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
+    styles = (SITE / "styles.css").read_text()
+    tablet_footer = styles.split("@media (max-width: 1100px)", 1)[1].split(
+        "@media (max-width: 900px)", 1
+    )[0]
+
+    assert "background: rgba(248, 247, 244, 0.76)" in styles
+    assert "backdrop-filter: blur(18px) saturate(120%)" in styles
+    assert "grid-template-columns: 1fr" in tablet_footer
+    assert "justify-items: center" in tablet_footer
+    assert "text-align: center" in tablet_footer
+    assert ".footer-nav > div" in tablet_footer
+    assert "align-items: center" in tablet_footer
 
 
 def test_site_bundles_original_visual_and_self_hosted_font() -> None:
