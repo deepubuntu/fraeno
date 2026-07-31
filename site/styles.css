@@ -416,6 +416,18 @@ h1 {
   min-width: 0;
 }
 
+.system-outcome {
+  margin: 0;
+  padding-top: clamp(2rem, 3.5vw, 3.5rem);
+  border-top: 1px solid var(--line);
+  grid-column: 2 / -1;
+  font-size: clamp(1.45rem, 2.1vw, 2.35rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .system-film {
   position: relative;
   overflow: hidden;
@@ -1093,6 +1105,11 @@ h1 {
     grid-column: 2;
   }
 
+  .system-outcome {
+    min-width: 0;
+    white-space: normal;
+  }
+
   .proof-image {
     left: 20%;
   }
@@ -1256,6 +1273,14 @@ h1 {
   .system-media {
     margin-top: 2rem;
     grid-column: 1 / -1;
+  }
+
+  .system-outcome {
+    margin-top: 2rem;
+    grid-column: 1 / -1;
+    font-size: clamp(1.9rem, 8vw, 2.8rem);
+    line-height: 1.02;
+    white-space: normal;
   }
 
   .system-film {
