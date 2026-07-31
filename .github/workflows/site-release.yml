@@ -90,6 +90,7 @@ jobs:
               --fail \
               --silent \
               --show-error \
-              "https://${host}/" |
-              grep --fixed-strings "Fraeno automatically manages"
+              "https://${host}/?commit=${COMMIT_SHA}" |
+              grep --fixed-strings \
+                "Fraeno updates the software inside robots, then tests that they still work."
           done
