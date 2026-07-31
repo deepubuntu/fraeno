@@ -407,7 +407,7 @@ h1 {
   overflow: hidden;
   border: 1px solid rgba(21, 21, 21, 0.1);
   border-radius: 1.4rem;
-  aspect-ratio: 1000 / 470;
+  aspect-ratio: 16 / 9;
   background: #dededb;
   box-shadow: 0 1.8rem 4rem rgba(35, 31, 27, 0.1);
 }
