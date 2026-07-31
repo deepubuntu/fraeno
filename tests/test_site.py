@@ -1,3 +1,7 @@
+import base64
+import hashlib
+import json
+import re
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -166,3 +170,50 @@ def test_site_bundles_original_visual_and_self_hosted_font() -> None:
     assert system_video.stat().st_size < 500_000
     assert system_poster.is_file()
     assert system_poster.stat().st_size < 50_000
+
+
+def test_site_has_complete_share_and_install_metadata() -> None:
+    page = (SITE / "index.html").read_text()
+    manifest = json.loads((SITE / "site.webmanifest").read_text())
+
+    assert 'rel="apple-touch-icon" href="/assets/apple-touch-icon.png"' in page
+    assert 'rel="manifest" href="/site.webmanifest"' in page
+    assert 'property="og:image" content="https://fraeno.com/assets/social-card.jpg"' in page
+    assert 'name="twitter:card" content="summary_large_image"' in page
+    assert manifest["name"] == "Fraeno"
+    assert manifest["display"] == "browser"
+    assert manifest["theme_color"] == "#ff6b2c"
+    assert {icon["sizes"] for icon in manifest["icons"]} == {"192x192", "512x512"}
+
+    for name in ("apple-touch-icon.png", "icon-192.png", "icon-512.png", "social-card.jpg"):
+        assert (SITE / "assets" / name).is_file()
+
+
+def test_structured_product_metadata_is_truthful() -> None:
+    page = (SITE / "index.html").read_text()
+    headers = (SITE / "_headers").read_text()
+    match = re.search(
+        r'<script type="application/ld\+json">\s*(.*?)\s*</script>',
+        page,
+        re.DOTALL,
+    )
+
+    assert match is not None
+    metadata = json.loads(match.group(1))
+    assert metadata["name"] == "Fraeno"
+    assert metadata["url"] == "https://fraeno.com/"
+    assert metadata["description"] == (
+        "Fraeno updates the software inside robots, then tests that they still work."
+    )
+    assert "offers" not in metadata
+
+    raw_match = re.search(
+        r'<script type="application/ld\+json">(.*?)</script>',
+        page,
+        re.DOTALL,
+    )
+    assert raw_match is not None
+    digest = base64.b64encode(
+        hashlib.sha256(raw_match.group(1).encode()).digest()
+    ).decode()
+    assert f"'sha256-{digest}'" in headers
