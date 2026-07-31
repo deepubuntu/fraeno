@@ -146,6 +146,15 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert "data-trace" in page
     assert 'src="/site.js?v=c15a9a8a"' in page
     assert page.count("A bad update can make a robot move the wrong way") == 1
+    why_section = page.split('<section class="system-intro section-shell"', 1)[1].split(
+        '<section class="proof"', 1
+    )[0]
+    assert why_section.count(
+        "Fraeno catches software changes that make robots behave dangerously."
+    ) == 1
+    assert 'class="system-outcome"' in why_section
+    assert ".system-outcome" in (SITE / "styles.css").read_text()
+    assert "grid-column: 2 / -1" in (SITE / "styles.css").read_text()
     assert page.count('data-proof-moment>') == 4
     assert "Fraeno catches software changes that make robots behave dangerously." in page
     assert "IntersectionObserver" in script
@@ -233,7 +242,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
-    assert 'href="/styles.css?v=d9cd5692"' in page
+    assert 'href="/styles.css?v=6c079861"' in page
     assert ".hero-support .round-link" in styles
     assert "padding-top: clamp(9.25rem, 17vh, 11.5rem)" in styles
     assert "padding-top: 9rem" in styles
