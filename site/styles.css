@@ -755,14 +755,14 @@ h1 {
 .site-footer {
   position: relative;
   overflow: hidden;
-  padding-top: clamp(6rem, 10vw, 9rem);
+  padding-top: clamp(6.25rem, 9vw, 8.75rem);
   background: var(--white);
   isolation: isolate;
 }
 
 .footer-glow {
   position: absolute;
-  z-index: -1;
+  z-index: 0;
   inset: 0;
   background: radial-gradient(
     120% 90% at 50% 115%,
@@ -770,82 +770,112 @@ h1 {
     rgba(255, 196, 155, 0.1) 38%,
     transparent 75%
   );
+  pointer-events: none;
 }
 
-.footer-grid {
+.footer-main {
+  position: relative;
+  z-index: 2;
   display: grid;
-  grid-template-columns: minmax(16rem, 0.9fr) minmax(22rem, 0.8fr);
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 clamp(1.5rem, 4.2vw, 3.75rem);
+  grid-template-columns: minmax(18rem, 26.25rem) minmax(0, 1fr);
   justify-content: space-between;
-  gap: clamp(4rem, 10vw, 9rem);
+  gap: clamp(4rem, 8vw, 8rem);
 }
 
 .footer-about {
-  max-width: 25rem;
+  max-width: 26.25rem;
 }
 
 .footer-about .wordmark {
-  font-size: 1.9rem;
+  font-size: 1.875rem;
+  font-weight: 500;
+  letter-spacing: -0.04em;
 }
 
-.footer-about p {
+.footer-about > p:not(.footer-note) {
   max-width: 24rem;
-  margin: 2rem 0;
-  color: rgba(21, 21, 21, 0.58);
-  font-size: 0.9rem;
-  font-weight: 350;
-  line-height: 1.5;
+  margin: 1.75rem 0 0;
+  color: rgba(21, 21, 21, 0.56);
+  font-size: 0.875rem;
+  font-weight: 300;
+  line-height: 1.45;
+}
+
+.footer-note {
+  max-width: 24rem;
+  margin: 1.5rem 0 1.75rem;
+  color: rgba(21, 21, 21, 0.4);
+  font-size: 0.8125rem;
+  font-weight: 300;
+  line-height: 1.45;
 }
 
 .footer-about small {
   color: rgba(21, 21, 21, 0.4);
-  font-size: 0.72rem;
-  font-weight: 350;
+  font-size: 0.8125rem;
+  font-weight: 300;
 }
 
 .footer-nav {
+  justify-self: end;
   display: grid;
-  grid-template-columns: repeat(2, minmax(9rem, 1fr));
-  gap: clamp(3rem, 7vw, 7rem);
+  width: min(100%, 46rem);
+  grid-template-columns: repeat(3, minmax(8rem, 1fr));
+  gap: clamp(2.5rem, 6vw, 6.875rem);
 }
 
 .footer-nav > div {
   display: flex;
   align-items: flex-start;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.125rem;
 }
 
 .footer-nav span {
-  margin-bottom: 0.7rem;
+  margin-bottom: 0.625rem;
   color: rgba(21, 21, 21, 0.42);
-  font-size: 0.74rem;
+  font-size: 0.875rem;
+  font-weight: 400;
 }
 
 .footer-nav a {
   color: var(--ink);
-  font-size: 1.1rem;
+  font-size: 1.125rem;
   font-weight: 400;
   letter-spacing: -0.025em;
   text-decoration: none;
-  transition:
-    color 180ms ease,
-    transform 180ms ease;
+  transition: opacity 250ms ease;
 }
 
 .footer-nav a:hover {
-  color: var(--orange);
-  transform: translateX(0.18rem);
+  opacity: 0.58;
 }
 
 .footer-word {
-  margin: clamp(4rem, 8vw, 7rem) -0.055em -0.19em;
-  color: rgba(255, 99, 51, 0.15);
-  font-size: clamp(11rem, 31vw, 32rem);
-  font-weight: 330;
-  letter-spacing: -0.105em;
-  line-height: 0.78;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-top: clamp(5rem, 8vw, 7rem);
+  font-size: 0;
+  line-height: 0;
   pointer-events: none;
-  white-space: nowrap;
+}
+
+.footer-word svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.footer-word text {
+  fill: rgba(255, 99, 51, 0.16);
+  font-family: var(--font);
+  font-size: 300px;
+  font-weight: 300;
 }
 
 [data-reveal] {
@@ -1163,20 +1193,21 @@ h1 {
     padding-top: 6rem;
   }
 
-  .footer-grid {
+  .footer-main {
+    padding: 0 1.5rem;
     grid-template-columns: 1fr;
     gap: 4rem;
   }
 
   .footer-nav {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 2rem;
+    justify-self: stretch;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2.5rem 2rem;
   }
 
   .footer-word {
-    margin-top: 3rem;
-    margin-bottom: 0;
-    font-size: 38vw;
+    margin-top: 4rem;
   }
 }
 
@@ -1187,6 +1218,22 @@ h1 {
 
   .hero-footer span:last-child {
     display: none;
+  }
+
+  .footer-main {
+    padding: 0 1rem;
+  }
+
+  .footer-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .footer-nav > div:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .footer-word {
+    margin-top: 3.5rem;
   }
 }
 

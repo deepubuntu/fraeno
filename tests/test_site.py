@@ -134,17 +134,21 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert "/assets/*" in headers
 
 
-def test_site_adapts_the_reference_navigation_and_footer_without_extra_copy() -> None:
+def test_site_adapts_the_reference_navigation_and_complete_footer() -> None:
     page = (SITE / "index.html").read_text()
     styles = (SITE / "styles.css").read_text()
 
     assert 'class="menu-button"' in page
-    assert 'class="footer-grid section-shell"' in page
+    assert 'class="footer-main"' in page
     assert 'class="footer-word"' in page
     assert 'class="footer-nav"' in page
+    assert 'href="#method"' in page
+    assert 'href="#coverage"' in page
+    assert 'textLength="1000"' in page
     assert "backdrop-filter: blur(24px)" in styles
     assert "radial-gradient(" in styles
-    assert "font-size: clamp(11rem, 31vw, 32rem)" in styles
+    assert "grid-template-columns: repeat(3, minmax(8rem, 1fr))" in styles
+    assert ".footer-word text" in styles
 
 
 def test_site_bundles_original_visual_and_self_hosted_font() -> None:
