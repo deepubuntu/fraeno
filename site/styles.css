@@ -211,11 +211,16 @@ p {
   content: "";
 }
 
+.hero-visual video,
 .hero-visual img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center;
+}
+
+.hero-poster {
+  display: none;
 }
 
 .hero-grid {
@@ -1031,6 +1036,7 @@ h1 {
     background: linear-gradient(180deg, rgba(216, 215, 211, 0.7), transparent 48%);
   }
 
+  .hero-visual video,
   .hero-visual img {
     object-position: 58% center;
   }
@@ -1283,5 +1289,13 @@ h1 {
   .hero-visual,
   .hero-word {
     transform: none;
+  }
+
+  .hero-visual video {
+    display: none;
+  }
+
+  .hero-poster {
+    display: block;
   }
 }

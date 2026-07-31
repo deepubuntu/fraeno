@@ -135,6 +135,9 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'poster="/assets/robot-system-poster.webp?v=22eddc0b"' in page
     assert 'src="/assets/robot-system-loop.mp4?v=e7e40370"' in page
     assert "data-section-video" in page
+    assert 'src="/assets/fraeno-hero-loop.mp4?v=358f74e3"' in page
+    assert 'poster="/assets/fraeno-hero-poster.jpg"' in page
+    assert "data-hero-video" in page
     assert 'src="/assets/fraeno-robot-arm.webp"' in page
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
@@ -142,6 +145,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert "the robot can still do the same jobs" in page
     assert "IntersectionObserver" in script
     assert "configureSectionVideo" in script
+    assert "configureHeroVideo" in script
     assert "requestAnimationFrame" in script
     assert "prefers-reduced-motion: reduce" in (SITE / "styles.css").read_text()
     assert "media-src" not in headers
@@ -187,7 +191,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )[0]
 
     assert (
-        "Fraeno updates the software inside robots, then tests that they still work."
+        "Catch dangerous changes in robot behavior before software reaches the real robot."
         in page
     )
     assert 'class="hero-support"' in page
@@ -206,6 +210,8 @@ def test_site_bundles_original_visual_and_self_hosted_font() -> None:
     license_file = SITE / "assets" / "INTER-TIGHT-OFL.txt"
     system_video = SITE / "assets" / "robot-system-loop.mp4"
     system_poster = SITE / "assets" / "robot-system-poster.webp"
+    hero_video = SITE / "assets" / "fraeno-hero-loop.mp4"
+    hero_poster = SITE / "assets" / "fraeno-hero-poster.jpg"
 
     assert robot.is_file()
     assert robot.stat().st_size < 100_000
@@ -215,6 +221,10 @@ def test_site_bundles_original_visual_and_self_hosted_font() -> None:
     assert system_video.stat().st_size < 500_000
     assert system_poster.is_file()
     assert system_poster.stat().st_size < 50_000
+    assert hero_video.is_file()
+    assert hero_video.stat().st_size < 1_000_000
+    assert hero_poster.is_file()
+    assert hero_poster.stat().st_size < 100_000
 
 
 def test_site_has_complete_share_and_install_metadata() -> None:
@@ -248,7 +258,7 @@ def test_structured_product_metadata_is_truthful() -> None:
     assert metadata["name"] == "Fraeno"
     assert metadata["url"] == "https://fraeno.com/"
     assert metadata["description"] == (
-        "Fraeno updates the software inside robots, then tests that they still work."
+        "Catch dangerous changes in robot behavior before software reaches the real robot."
     )
     assert "offers" not in metadata
 

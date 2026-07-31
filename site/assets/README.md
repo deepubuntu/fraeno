@@ -2,6 +2,10 @@
 
 `fraeno-robot-arm.webp` is an original unbranded visual generated for Fraeno.
 
+`fraeno-hero-loop.mp4` is an owner-supplied robot animation slowed to half speed, stripped of
+audio, cropped to exclude the source watermark, and optimized for silent browser playback.
+`fraeno-hero-poster.jpg` is the matching still shown while that loop loads.
+
 `robot-system-loop.mp4` and `robot-system-poster.webp` are optimized from a clean, unbranded
 robotics motion graphic supplied by the project owner. The published loop is silent and cropped
 to exclude the source watermark.

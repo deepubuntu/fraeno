@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Fraeno | Robot updates tested before deployment</title>
+    <title>Fraeno | Catch dangerous robot changes before deployment</title>
     <meta
       name="description"
-      content="Fraeno updates the software inside robots, then tests that they still work."
+      content="Catch dangerous changes in robot behavior before software reaches the real robot."
     />
     <link rel="canonical" href="https://fraeno.com/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -21,15 +21,18 @@
     />
     <link
       rel="preload"
-      href="/assets/fraeno-robot-arm.webp"
+      href="/assets/fraeno-hero-poster.jpg"
       as="image"
-      type="image/webp"
+      type="image/jpeg"
       fetchpriority="high"
     />
     <meta name="theme-color" content="#d8d7d3" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Fraeno" />
-    <meta property="og:description" content="Robot updates tested before deployment." />
+    <meta
+      property="og:description"
+      content="Catch dangerous changes in robot behavior before software reaches the real robot."
+    />
     <meta property="og:url" content="https://fraeno.com/" />
     <meta property="og:image" content="https://fraeno.com/assets/social-card.jpg" />
     <meta property="og:image:width" content="1200" />
@@ -40,7 +43,10 @@
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Fraeno" />
-    <meta name="twitter:description" content="Robot updates tested before deployment." />
+    <meta
+      name="twitter:description"
+      content="Catch dangerous changes in robot behavior before software reaches the real robot."
+    />
     <meta name="twitter:image" content="https://fraeno.com/assets/social-card.jpg" />
     <script type="application/ld+json">
       {
@@ -50,7 +56,7 @@
         "url": "https://fraeno.com/",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Ubuntu 22.04",
-        "description": "Fraeno updates the software inside robots, then tests that they still work."
+        "description": "Catch dangerous changes in robot behavior before software reaches the real robot."
       }
     </script>
     <link rel="stylesheet" href="/styles.css" />
@@ -88,17 +94,34 @@
     <main id="main">
       <section class="hero" data-hero>
         <div class="hero-visual" data-hero-visual aria-hidden="true">
-          <img src="/assets/fraeno-robot-arm.webp" alt="" width="1536" height="1024" />
+          <video
+            autoplay
+            muted
+            loop
+            playsinline
+            preload="metadata"
+            poster="/assets/fraeno-hero-poster.jpg"
+            data-hero-video
+          >
+            <source src="/assets/fraeno-hero-loop.mp4?v=358f74e3" type="video/mp4" />
+          </video>
+          <img
+            class="hero-poster"
+            src="/assets/fraeno-hero-poster.jpg"
+            alt=""
+            width="1136"
+            height="720"
+          />
         </div>
 
         <div class="hero-grid section-shell">
           <div class="hero-heading">
             <h1 data-hero-item>
-              Fraeno updates the software inside robots, then tests that they still work.
+              Catch dangerous changes in robot behavior before software reaches the real robot.
             </h1>
             <div class="hero-support" data-hero-item>
               <p class="plain-language">
-              <em>essentially, dependabot for robots + integration testing.</em>
+                <em>essentially, dependabot for robots + integration testing.</em>
               </p>
               <a class="round-link" href="#system">
                 <span>See the system test</span>
