@@ -130,6 +130,8 @@ const configureHeroVideo = () => {
     return;
   }
 
+  heroVideo.controls = false;
+
   if (reducedMotion.matches) {
     heroVideo.pause();
     heroVideo.currentTime = 0;
@@ -138,6 +140,9 @@ const configureHeroVideo = () => {
 
   heroVideo.play().catch(() => {});
 };
+
+heroVideo?.addEventListener("canplay", configureHeroVideo);
+window.addEventListener("pageshow", configureHeroVideo);
 
 const configureSectionVideo = () => {
   videoObserver?.disconnect();
