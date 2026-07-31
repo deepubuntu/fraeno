@@ -235,7 +235,7 @@ p {
   position: relative;
   z-index: 3;
   display: grid;
-  padding-top: clamp(7.8rem, 14vh, 10rem);
+  padding-top: clamp(9.25rem, 17vh, 11.5rem);
   grid-template-columns: minmax(0, 1.3fr) minmax(18rem, 0.7fr);
   align-items: start;
   gap: clamp(3rem, 9vw, 10rem);
@@ -1148,7 +1148,7 @@ h1 {
   }
 
   .hero-grid {
-    padding-top: 7.6rem;
+    padding-top: 9rem;
     grid-template-columns: 1fr;
     gap: 1.8rem;
   }
