@@ -180,13 +180,19 @@ def test_site_keeps_the_full_plain_language_method_illustration() -> None:
 
 
 def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
+    page = (SITE / "index.html").read_text()
     styles = (SITE / "styles.css").read_text()
     tablet_footer = styles.split("@media (max-width: 1100px)", 1)[1].split(
         "@media (max-width: 900px)", 1
     )[0]
 
-    assert "background: rgba(248, 247, 244, 0.76)" in styles
-    assert "backdrop-filter: blur(18px) saturate(120%)" in styles
+    assert (
+        "Fraeno updates the software inside robots, then tests that they still work."
+        in page
+    )
+    assert 'class="hero-support"' in page
+    assert 'class="hero-aside"' not in page
+    assert ".hero-support .round-link" in styles
     assert "grid-template-columns: 1fr" in tablet_footer
     assert "justify-items: center" in tablet_footer
     assert "text-align: center" in tablet_footer
