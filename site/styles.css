@@ -219,6 +219,14 @@ p {
   object-position: center;
 }
 
+.hero-visual video {
+  pointer-events: none;
+}
+
+.hero-visual video::-webkit-media-controls {
+  display: none !important;
+}
+
 .hero-poster {
   display: none;
 }

@@ -135,7 +135,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'poster="/assets/robot-system-poster.webp?v=22eddc0b"' in page
     assert 'src="/assets/robot-system-loop.mp4?v=e7e40370"' in page
     assert "data-section-video" in page
-    assert 'src="/assets/fraeno-hero-loop.mp4?v=358f74e3"' in page
+    assert 'src="/assets/fraeno-hero-loop.mp4?v=fbaf2148"' in page
     assert 'poster="/assets/fraeno-hero-poster.jpg"' in page
     assert "data-hero-video" in page
     assert 'src="/assets/fraeno-robot-arm.webp"' in page
@@ -146,6 +146,15 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert "IntersectionObserver" in script
     assert "configureSectionVideo" in script
     assert "configureHeroVideo" in script
+    hero_tag = re.search(r"<video\s+(.*?)data-hero-video\s*>", page, re.DOTALL)
+    assert hero_tag is not None
+    hero_attributes = hero_tag.group(1)
+    for required_attribute in ("autoplay", "muted", "loop", "playsinline"):
+        assert required_attribute in hero_attributes
+    assert "controls" not in hero_attributes
+    assert 'preload="auto"' in hero_attributes
+    assert "heroVideo.controls = false" in script
+    assert "::-webkit-media-controls" in (SITE / "styles.css").read_text()
     assert "requestAnimationFrame" in script
     assert "prefers-reduced-motion: reduce" in (SITE / "styles.css").read_text()
     assert "media-src" not in headers
@@ -191,7 +200,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )[0]
 
     assert (
-        "Catch dangerous changes in robot behavior before software reaches the real robot."
+        "Stop dangerous robot behavior before deployment."
         in page
     )
     assert 'class="hero-support"' in page
