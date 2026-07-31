@@ -1,7 +1,7 @@
 {
   "name": "Fraeno",
   "short_name": "Fraeno",
-  "description": "Catch dangerous changes in robot behavior before software reaches the real robot.",
+  "description": "Fraeno catches software changes that make robots behave dangerously.",
   "start_url": "/",
   "display": "browser",
   "background_color": "#d8d7d3",
