@@ -157,6 +157,10 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'class="system-outcome"' in why_section
     assert ".system-outcome" in (SITE / "styles.css").read_text()
     assert "grid-column: 2 / -1" in (SITE / "styles.css").read_text()
+    assert (
+        "grid-template-columns: 2.5rem minmax(14rem, 0.55fr) minmax(28rem, 1.45fr)"
+        in (SITE / "styles.css").read_text()
+    )
     assert page.count('data-proof-moment>') == 3
     assert "Fraeno catches software changes that make robots behave dangerously." in page
     assert "IntersectionObserver" in script
@@ -214,7 +218,7 @@ def test_site_keeps_the_full_plain_language_method_illustration() -> None:
     assert "Run the existing and updated software" in page
     assert "Detect and block dangerous changes" in page
     assert "without putting the real machine at risk" in page
-    assert "minmax(26rem, 1.28fr)" in styles
+    assert "minmax(28rem, 1.45fr)" in styles
 
 
 def test_action_and_supported_systems_follow_the_approved_page_order() -> None:
@@ -244,7 +248,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
-    assert 'href="/styles.css?v=4f90b2bc"' in page
+    assert 'href="/styles.css?v=eeeb01e9"' in page
     assert ".hero-support .round-link" in styles
     assert "padding-top: clamp(11.5rem, 22vh, 14rem)" in styles
     assert "padding-top: 11rem" in styles
