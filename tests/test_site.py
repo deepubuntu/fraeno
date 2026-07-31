@@ -118,8 +118,8 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     headers = (SITE / "_headers").read_text()
 
     assert '<video\n              muted\n              loop\n              playsinline' in page
-    assert 'poster="/assets/robot-system-poster.webp?v=09c86e66"' in page
-    assert 'src="/assets/robot-system-loop.mp4?v=dc6f02c0"' in page
+    assert 'poster="/assets/robot-system-poster.webp?v=22eddc0b"' in page
+    assert 'src="/assets/robot-system-loop.mp4?v=e7e40370"' in page
     assert "data-section-video" in page
     assert 'src="/assets/fraeno-robot-arm.webp"' in page
     assert 'href="/assets/inter-tight-latin.woff2"' in page
