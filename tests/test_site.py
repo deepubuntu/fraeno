@@ -200,7 +200,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )[0]
 
     assert (
-        "Stop dangerous robot behavior before deployment."
+        "Catch dangerous robot behavior before deployment."
         in page
     )
     assert 'class="hero-support"' in page
