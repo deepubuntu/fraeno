@@ -1,5 +1,6 @@
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).parents[1]
 SITE = ROOT / "site"
@@ -57,7 +58,8 @@ def test_site_has_expected_identity_and_local_assets() -> None:
 
     for target in parser.links:
         if target.startswith("/") and target != "/":
-            assert (SITE / target.removeprefix("/")).is_file(), target
+            asset_path = urlsplit(target).path.removeprefix("/")
+            assert (SITE / asset_path).is_file(), target
 
 
 def test_site_preserves_approved_product_copy() -> None:
@@ -116,8 +118,8 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     headers = (SITE / "_headers").read_text()
 
     assert '<video\n              muted\n              loop\n              playsinline' in page
-    assert 'poster="/assets/robot-system-poster.webp"' in page
-    assert 'src="/assets/robot-system-loop.mp4"' in page
+    assert 'poster="/assets/robot-system-poster.webp?v=09c86e66"' in page
+    assert 'src="/assets/robot-system-loop.mp4?v=dc6f02c0"' in page
     assert "data-section-video" in page
     assert 'src="/assets/fraeno-robot-arm.webp"' in page
     assert 'href="/assets/inter-tight-latin.woff2"' in page
