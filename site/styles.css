@@ -235,7 +235,7 @@ p {
   position: relative;
   z-index: 3;
   display: grid;
-  padding-top: clamp(9.25rem, 17vh, 11.5rem);
+  padding-top: clamp(11.5rem, 22vh, 14rem);
   grid-template-columns: minmax(0, 1.3fr) minmax(18rem, 0.7fr);
   align-items: start;
   gap: clamp(3rem, 9vw, 10rem);
@@ -464,7 +464,7 @@ h1 {
   --trace-progress: 0;
   --trace-offset: 1.25rem;
   position: relative;
-  height: 360svh;
+  height: 280svh;
   background: var(--black);
   color: var(--white);
   isolation: isolate;
@@ -565,6 +565,12 @@ h1 {
 
 .proof-moment.is-past {
   transform: translateY(-0.45em);
+}
+
+.proof-moment:last-child {
+  max-width: 12ch;
+  font-size: 0.78em;
+  line-height: 0.92;
 }
 
 .proof-result {
@@ -1219,7 +1225,7 @@ h1 {
   }
 
   .hero-grid {
-    padding-top: 9rem;
+    padding-top: 11rem;
     grid-template-columns: 1fr;
     gap: 1.8rem;
   }

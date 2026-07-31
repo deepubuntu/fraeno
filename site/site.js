@@ -38,8 +38,12 @@ const updateProof = () => {
   const bounds = proof.getBoundingClientRect();
   const travel = Math.max(bounds.height - window.innerHeight, 1);
   const progress = Math.min(Math.max(-bounds.top / travel, 0), 1);
-  const activeIndex = Math.min(Math.floor(progress / 0.2), proofMoments.length - 1);
-  const traceProgress = Math.min(Math.max((progress - 0.8) / 0.14, 0), 1);
+  const momentProgress = Math.min(progress / 0.72, 0.999);
+  const activeIndex = Math.min(
+    Math.floor(momentProgress * proofMoments.length),
+    proofMoments.length - 1,
+  );
+  const traceProgress = Math.min(Math.max((progress - 0.72) / 0.16, 0), 1);
 
   proof.style.setProperty("--proof-progress", progress.toFixed(3));
   proof.style.setProperty("--proof-brightness", (0.42 + progress * 0.07).toFixed(3));

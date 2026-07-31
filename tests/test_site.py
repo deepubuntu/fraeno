@@ -105,16 +105,18 @@ def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None
 def test_site_shows_verified_external_proof_without_overclaiming() -> None:
     page = (SITE / "index.html").read_text()
 
-    assert "Sent information" in page
+    assert "Stop button" in page
+    assert "Pressed" in page
     assert "Robot" in page
-    assert "Heard nothing" in page
-    assert "Movement" in page
-    assert "Stopped" in page
+    assert "Kept moving" in page
+    assert "Fraeno" in page
+    assert "Blocked the update" in page
     assert (
         "https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
         in page
     )
-    assert "Fraeno caught the problem" in page
+    assert "Real robot protected" in page
+    assert "Example: the stop button was pressed" in page
     assert (
         "Fraeno checks the robot actions you choose. It cannot promise every possible action is"
         in page
@@ -144,7 +146,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
     assert "data-trace" in page
-    assert 'src="/site.js?v=c15a9a8a"' in page
+    assert 'src="/site.js?v=e92d44e8"' in page
     assert page.count("A bad update can make a robot move the wrong way") == 1
     why_section = page.split('<section class="system-intro section-shell"', 1)[1].split(
         '<section class="proof"', 1
@@ -155,7 +157,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'class="system-outcome"' in why_section
     assert ".system-outcome" in (SITE / "styles.css").read_text()
     assert "grid-column: 2 / -1" in (SITE / "styles.css").read_text()
-    assert page.count('data-proof-moment>') == 4
+    assert page.count('data-proof-moment>') == 3
     assert "Fraeno catches software changes that make robots behave dangerously." in page
     assert "IntersectionObserver" in script
     assert "updateProof" in script
@@ -242,10 +244,10 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
-    assert 'href="/styles.css?v=6c079861"' in page
+    assert 'href="/styles.css?v=4f90b2bc"' in page
     assert ".hero-support .round-link" in styles
-    assert "padding-top: clamp(9.25rem, 17vh, 11.5rem)" in styles
-    assert "padding-top: 9rem" in styles
+    assert "padding-top: clamp(11.5rem, 22vh, 14rem)" in styles
+    assert "padding-top: 11rem" in styles
     assert "grid-template-columns: 1fr" in tablet_footer
     assert "justify-items: center" in tablet_footer
     assert "text-align: center" in tablet_footer
@@ -253,7 +255,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     assert "align-items: center" in tablet_footer
 
 
-def test_site_pins_the_four_step_security_story_and_keeps_a_static_fallback() -> None:
+def test_site_pins_the_three_step_security_story_and_keeps_a_static_fallback() -> None:
     page = (SITE / "index.html").read_text()
     styles = (SITE / "styles.css").read_text()
     script = (SITE / "site.js").read_text()
@@ -262,18 +264,19 @@ def test_site_pins_the_four_step_security_story_and_keeps_a_static_fallback() ->
     for moment in (
         "Fraeno is the security gate",
         "between a software update and the robot.",
-        "It catches changes",
-        "that make the robot behave dangerously.",
+        "It catches changes that make the robot behave dangerously.",
     ):
         assert moment in page
 
-    assert "height: 360svh" in styles
+    assert "height: 280svh" in styles
     assert ".proof-stage" in styles
     assert "position: sticky" in styles
     assert ".proof-moment.is-active" in styles
     assert ".proof-moment.is-next" in styles
-    assert "const activeIndex = Math.min(Math.floor(progress / 0.2)" in script
-    assert "const traceProgress = Math.min(Math.max((progress - 0.8) / 0.14" in script
+    assert ".proof-moment:last-child" in styles
+    assert "const momentProgress = Math.min(progress / 0.72, 0.999)" in script
+    assert "Math.floor(momentProgress * proofMoments.length)" in script
+    assert "const traceProgress = Math.min(Math.max((progress - 0.72) / 0.16" in script
     assert "height: auto" in reduced_motion
     assert "position: static" in reduced_motion
     assert ".proof-result" in reduced_motion
@@ -303,26 +306,25 @@ def test_site_bundles_original_visual_and_self_hosted_font() -> None:
     assert hero_poster.stat().st_size < 100_000
 
 
-def test_site_has_complete_share_and_install_metadata() -> None:
+def test_site_has_share_metadata_without_the_retired_favicons() -> None:
     page = (SITE / "index.html").read_text()
     manifest = json.loads((SITE / "site.webmanifest").read_text())
 
-    assert 'rel="apple-touch-icon" href="/assets/apple-touch-icon.png"' in page
+    assert 'rel="icon"' not in page
+    assert 'rel="apple-touch-icon"' not in page
     assert 'rel="manifest" href="/site.webmanifest"' in page
     assert "https://fraeno.com/assets/social-card-16fc030d.jpg" in page
     assert 'name="twitter:card" content="summary_large_image"' in page
     assert manifest["name"] == "Fraeno"
     assert manifest["display"] == "browser"
     assert manifest["theme_color"] == "#ff6b2c"
-    assert {icon["sizes"] for icon in manifest["icons"]} == {"192x192", "512x512"}
+    assert "icons" not in manifest
 
-    for name in (
-        "apple-touch-icon.png",
-        "icon-192.png",
-        "icon-512.png",
-        "social-card-16fc030d.jpg",
-    ):
-        assert (SITE / "assets" / name).is_file()
+    for name in ("apple-touch-icon.png", "icon-192.png", "icon-512.png"):
+        assert not (SITE / "assets" / name).exists()
+
+    assert not (SITE / "favicon.svg").exists()
+    assert (SITE / "assets" / "social-card-16fc030d.jpg").is_file()
 
 
 def test_structured_product_metadata_is_truthful() -> None:
