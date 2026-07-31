@@ -3,6 +3,7 @@ const menuButton = document.querySelector("[data-menu-button]");
 const navigation = document.querySelector("[data-navigation]");
 const hero = document.querySelector("[data-hero]");
 const proof = document.querySelector("[data-proof]");
+const sectionVideo = document.querySelector("[data-section-video]");
 const revealItems = document.querySelectorAll("[data-reveal]");
 const methodSteps = document.querySelectorAll("[data-step]");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -13,6 +14,7 @@ const updateHeader = () => {
 
 const closeMenu = () => {
   navigation?.classList.remove("is-open");
+  menuButton?.classList.remove("is-open");
   menuButton?.setAttribute("aria-expanded", "false");
 };
 
@@ -40,6 +42,7 @@ const onScroll = () => {
 
 menuButton?.addEventListener("click", () => {
   const isOpen = navigation?.classList.toggle("is-open") ?? false;
+  menuButton.classList.toggle("is-open", isOpen);
   menuButton.setAttribute("aria-expanded", String(isOpen));
 });
 
@@ -119,14 +122,51 @@ if (reducedMotion.matches || !("IntersectionObserver" in window)) {
   }
 }
 
+let videoObserver;
+
+const configureSectionVideo = () => {
+  videoObserver?.disconnect();
+
+  if (!sectionVideo) {
+    return;
+  }
+
+  if (reducedMotion.matches) {
+    sectionVideo.pause();
+    sectionVideo.currentTime = 0;
+    return;
+  }
+
+  if (!("IntersectionObserver" in window)) {
+    sectionVideo.play().catch(() => {});
+    return;
+  }
+
+  videoObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          sectionVideo.play().catch(() => {});
+        } else {
+          sectionVideo.pause();
+        }
+      });
+    },
+    { rootMargin: "80px 0px", threshold: 0.2 },
+  );
+  videoObserver.observe(sectionVideo);
+};
+
 reducedMotion.addEventListener("change", () => {
   if (reducedMotion.matches && hero) {
     hero.style.setProperty("--pointer-x", "0px");
     hero.style.setProperty("--pointer-y", "0px");
     hero.style.setProperty("--hero-progress", "0");
   }
+  configureSectionVideo();
 });
 
 window.addEventListener("scroll", onScroll, { passive: true });
 window.addEventListener("resize", updateHero);
+configureSectionVideo();
 onScroll();
