@@ -135,7 +135,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'poster="/assets/robot-system-poster.webp?v=22eddc0b"' in page
     assert 'src="/assets/robot-system-loop.mp4?v=e7e40370"' in page
     assert "data-section-video" in page
-    assert 'src="/assets/fraeno-hero-loop.mp4?v=fbaf2148"' in page
+    assert 'src="/assets/fraeno-hero-loop.mp4?v=8e05b143"' in page
     assert 'poster="/assets/fraeno-hero-poster.jpg"' in page
     assert "data-hero-video" in page
     assert 'src="/assets/fraeno-robot-arm.webp"' in page
