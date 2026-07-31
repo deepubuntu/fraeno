@@ -226,6 +226,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
+    assert 'href="/styles.css?v=fd9c5bc3"' in page
     assert ".hero-support .round-link" in styles
     assert "padding-top: clamp(9.25rem, 17vh, 11.5rem)" in styles
     assert "padding-top: 9rem" in styles
