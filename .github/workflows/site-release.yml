@@ -92,5 +92,5 @@ jobs:
               --show-error \
               "https://${host}/?commit=${COMMIT_SHA}" |
               grep --fixed-strings \
-                "Fraeno updates the software inside robots, then tests that they still work."
+                "Fraeno catches software changes that make robots behave dangerously."
           done

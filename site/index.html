@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Fraeno | Catch dangerous robot changes before deployment</title>
+    <title>Fraeno | Catch dangerous robot behavior before deployment</title>
     <meta
       name="description"
-      content="Catch dangerous changes in robot behavior before software reaches the real robot."
+      content="Fraeno catches software changes that make robots behave dangerously."
     />
     <link rel="canonical" href="https://fraeno.com/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -28,26 +28,38 @@
     />
     <meta name="theme-color" content="#d8d7d3" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Fraeno" />
+    <meta
+      property="og:title"
+      content="Catch dangerous robot behavior before deployment."
+    />
     <meta
       property="og:description"
-      content="Catch dangerous changes in robot behavior before software reaches the real robot."
+      content="Fraeno is the security gate between a software update and the robot. It catches changes that make the robot behave dangerously."
     />
     <meta property="og:url" content="https://fraeno.com/" />
-    <meta property="og:image" content="https://fraeno.com/assets/social-card.jpg" />
+    <meta
+      property="og:image"
+      content="https://fraeno.com/assets/social-card-16fc030d.jpg"
+    />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="Fraeno beside a robot arm with the words Update the software. Keep the robot working."
+      content="Fraeno beside a robot arm with the words Catch dangerous robot behavior before deployment."
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Fraeno" />
+    <meta
+      name="twitter:title"
+      content="Catch dangerous robot behavior before deployment."
+    />
     <meta
       name="twitter:description"
-      content="Catch dangerous changes in robot behavior before software reaches the real robot."
+      content="Fraeno is the security gate between a software update and the robot. It catches changes that make the robot behave dangerously."
     />
-    <meta name="twitter:image" content="https://fraeno.com/assets/social-card.jpg" />
+    <meta
+      name="twitter:image"
+      content="https://fraeno.com/assets/social-card-16fc030d.jpg"
+    />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -56,7 +68,7 @@
         "url": "https://fraeno.com/",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Ubuntu 22.04",
-        "description": "Catch dangerous changes in robot behavior before software reaches the real robot."
+        "description": "Fraeno catches software changes that make robots behave dangerously."
       }
     </script>
     <link rel="stylesheet" href="/styles.css" />
@@ -82,9 +94,8 @@
       </button>
 
       <nav id="primary-navigation" aria-label="Primary navigation" data-navigation>
-        <a href="#system">System test</a>
-        <a href="#method">How it works</a>
-        <a href="#proof">Proof</a>
+        <a href="#why">Why it matters</a>
+        <a href="#action">Fraeno in action</a>
         <a class="nav-action" href="https://github.com/apps/fraeno-robotics">
           Install Fraeno
         </a>
@@ -123,10 +134,10 @@
             </h1>
             <div class="hero-support" data-hero-item>
               <p class="plain-language">
-                <em>essentially, dependabot for robots + integration testing.</em>
+                <em>essentially, dependabot for robots + a security gate before deployment.</em>
               </p>
-              <a class="round-link" href="#system">
-                <span>See the system test</span>
+              <a class="round-link" href="#action">
+                <span>See Fraeno in action</span>
                 <i aria-hidden="true">→</i>
               </a>
             </div>
@@ -136,17 +147,17 @@
         <div class="hero-word" aria-hidden="true">fraeno</div>
 
         <div class="hero-footer section-shell" data-hero-item>
-          <span>Whole-robot testing</span>
+          <span>Safer robot updates</span>
           <span>Built for ROS 2</span>
           <span>Illustrative hardware</span>
         </div>
       </section>
 
-      <section class="system-intro section-shell" id="system">
+      <section class="system-intro section-shell" id="why">
         <p class="section-number" data-reveal>01</p>
         <div class="system-copy" data-reveal>
-          <p class="section-label">One update, one answer</p>
-          <h2>The code can look fine while the robot still fails.</h2>
+          <p class="section-label">Why it matters</p>
+          <h2>An update can look harmless while the robot becomes dangerous.</h2>
         </div>
         <div class="system-media" data-reveal>
           <div class="system-film" aria-hidden="true">
@@ -163,13 +174,13 @@
             </video>
           </div>
           <p class="section-summary">
-            Fraeno first watches the robot as it works. Then it tries the update and checks that
-            the robot can still do the same jobs.
+            A bad update can make a robot move the wrong way, fail to stop, or become dangerous
+            to people. Fraeno catches software changes that make robots behave dangerously.
           </p>
         </div>
       </section>
 
-      <section class="proof" id="proof" data-proof>
+      <section class="proof" id="method" data-proof>
         <div class="proof-image" aria-hidden="true">
           <img
             src="/assets/fraeno-robot-arm.webp"
@@ -182,80 +193,105 @@
 
         <div class="proof-inner section-shell">
           <div class="proof-heading" data-reveal>
-            <p>Production test</p>
+            <p>How it works</p>
             <h2>
-              It built.
-              <span>Then the robot stopped hearing its sensor.</span>
+              Fraeno is the security gate between a software update and the robot.
+              <span>It catches changes that make the robot behave dangerously.</span>
             </h2>
           </div>
 
           <div
             class="trace"
-            aria-label="How information moved through the robot after the update"
+            aria-label="A dangerous update that Fraeno caught"
             data-trace
           >
             <div class="trace-node">
               <span>Sensor</span>
-              <strong>Sent 20.6 readings each second</strong>
+              <strong>Sent information</strong>
             </div>
             <div class="trace-line trace-line-live" aria-hidden="true"><span></span></div>
             <div class="trace-node">
-              <span>Robot controller</span>
-              <strong>Received nothing</strong>
+              <span>Robot</span>
+              <strong>Heard nothing</strong>
             </div>
             <div class="trace-line trace-line-broken" aria-hidden="true"></div>
             <div class="trace-node">
-              <span>Movement commands</span>
+              <span>Movement</span>
               <strong>Stopped</strong>
             </div>
           </div>
 
           <div class="proof-footer" data-reveal>
             <div>
-              <span>Fraeno decision</span>
-              <strong>Blocked before deployment</strong>
+              <span>Fraeno caught the problem</span>
+              <strong>Update blocked</strong>
             </div>
             <a
               href="https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
             >
-              View the run
+              See the real run
               <span aria-hidden="true">↗</span>
             </a>
           </div>
         </div>
       </section>
 
-      <section class="method section-shell" id="method" aria-labelledby="method-title">
+      <section class="method section-shell" aria-labelledby="method-title">
         <header data-reveal>
           <p class="section-number">02</p>
           <div>
-            <p class="section-label">How it works</p>
-            <h2 id="method-title">Test the whole robot before the update goes live.</h2>
+            <p class="section-label">A safe place for the robot</p>
+            <h2 id="method-title">Try the update away from the real robot.</h2>
+            <p class="method-summary">
+              Fraeno runs the update on the robot inside a virtual environment. It watches how
+              the robot senses, moves, and responds without putting the real machine at risk.
+            </p>
           </div>
         </header>
 
         <ol class="method-steps">
           <li data-step>
             <span>01</span>
-            <strong>Find one update</strong>
+            <strong>Find the update</strong>
           </li>
           <li data-step>
             <span>02</span>
-            <strong>Watch the robot work now</strong>
+            <strong>Create a virtual copy of the robot</strong>
           </li>
           <li data-step>
             <span>03</span>
-            <strong>Try the updated software</strong>
+            <strong>Run the existing and updated software</strong>
           </li>
           <li data-step>
             <span>04</span>
-            <strong>Check that the robot still works</strong>
+            <strong>Detect and block dangerous changes</strong>
           </li>
         </ol>
       </section>
 
+      <section class="action section-shell" id="action" aria-labelledby="action-title">
+        <header data-reveal>
+          <p class="section-number">03</p>
+          <div>
+            <h2 id="action-title">See Fraeno in action.</h2>
+          </div>
+        </header>
+
+        <div class="action-window" data-reveal>
+          <div class="action-window-bar" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="action-placeholder">
+            <i aria-hidden="true"></i>
+            <p>Screen recording coming soon</p>
+          </div>
+        </div>
+      </section>
+
       <section class="availability section-shell" id="coverage" data-reveal>
-        <p>Available now</p>
+        <p>Supported systems</p>
         <div class="availability-list">
           <span>ROS 2 Humble</span>
           <span>Ubuntu 22.04</span>
@@ -263,15 +299,15 @@
           <span>GitHub App</span>
         </div>
         <small>
-          A pass means the robot checks you chose worked. It does not promise that every possible
-          action is safe.
+          Fraeno checks the robot actions you choose. It cannot promise every possible action is
+          safe.
         </small>
       </section>
 
       <section class="closing">
         <div class="closing-inner section-shell" data-reveal>
           <p>Fraeno</p>
-          <h2>Test the update before the robot does.</h2>
+          <h2>Protect the robot from dangerous software updates.</h2>
           <a class="install-link" href="https://github.com/apps/fraeno-robotics">
             Install Fraeno
             <span aria-hidden="true">→</span>
@@ -286,23 +322,18 @@
       <div class="footer-main">
         <div class="footer-about" data-reveal>
           <a class="wordmark" href="/" aria-label="Fraeno home">fraeno</a>
-          <p>Fraeno updates the software inside robots, then tests that they still work.</p>
+          <p>Fraeno catches software changes that make robots behave dangerously.</p>
           <p class="footer-note">
-            <em>essentially, dependabot for robots + integration testing.</em>
+            <em>essentially, dependabot for robots + a security gate before deployment.</em>
           </p>
-          <small>© 2026 Fraeno</small>
+          <small>© 2026 DeepUbuntu Labs</small>
         </div>
 
         <nav class="footer-nav" aria-label="Footer navigation" data-reveal>
           <div>
             <span>Explore</span>
-            <a href="#system">System test</a>
-            <a href="#proof">Proof</a>
-          </div>
-          <div>
-            <span>Product</span>
-            <a href="#method">How it works</a>
-            <a href="#coverage">What it checks</a>
+            <a href="#why">Why it matters</a>
+            <a href="#action">Fraeno in action</a>
           </div>
           <div>
             <span>Get started</span>

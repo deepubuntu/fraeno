@@ -69,14 +69,15 @@ def test_site_has_expected_identity_and_local_assets() -> None:
 def test_site_preserves_approved_product_copy() -> None:
     page = (SITE / "index.html").read_text()
 
+    assert "Catch dangerous robot behavior before deployment." in page
     assert (
-        "Fraeno updates the software inside robots, then tests that they still work."
+        "essentially, dependabot for robots + a security gate before deployment."
     ) in page
-    assert "essentially, dependabot for robots + integration testing." in page
     assert (
-        "A pass means the robot checks you chose worked. It does not promise that every possible"
-        in page
-    )
+        "A bad update can make a robot move the wrong way, fail to stop, or become dangerous"
+    ) in page
+    assert "Fraeno catches software changes that make robots behave dangerously." in page
+    assert "© 2026 DeepUbuntu Labs" in page
 
 
 def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None:
@@ -103,18 +104,18 @@ def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None
 def test_site_shows_verified_external_proof_without_overclaiming() -> None:
     page = (SITE / "index.html").read_text()
 
-    assert "Sent 20.6 readings each second" in page
-    assert "Robot controller" in page
-    assert "Received nothing" in page
-    assert "Movement commands" in page
+    assert "Sent information" in page
+    assert "Robot" in page
+    assert "Heard nothing" in page
+    assert "Movement" in page
     assert "Stopped" in page
     assert (
         "https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
         in page
     )
-    assert "Production test" in page
+    assert "Fraeno caught the problem" in page
     assert (
-        "A pass means the robot checks you chose worked. It does not promise that every possible"
+        "Fraeno checks the robot actions you choose. It cannot promise every possible action is"
         in page
     )
 
@@ -142,7 +143,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
     assert "data-trace" in page
-    assert "the robot can still do the same jobs" in page
+    assert "Fraeno catches software changes that make robots behave dangerously." in page
     assert "IntersectionObserver" in script
     assert "configureSectionVideo" in script
     assert "configureHeroVideo" in script
@@ -170,12 +171,17 @@ def test_site_adapts_the_reference_navigation_and_complete_footer() -> None:
     assert 'class="footer-main"' in page
     assert 'class="footer-word"' in page
     assert 'class="footer-nav"' in page
-    assert 'href="#method"' in page
-    assert 'href="#coverage"' in page
+    primary_navigation = page.split(
+        '<nav id="primary-navigation"', 1
+    )[1].split("</nav>", 1)[0]
+    assert 'href="#why"' in primary_navigation
+    assert 'href="#action"' in primary_navigation
+    assert 'href="#method"' not in primary_navigation
+    assert 'href="#coverage"' not in primary_navigation
     assert 'textLength="1000"' in page
     assert "backdrop-filter: blur(24px)" in styles
     assert "radial-gradient(" in styles
-    assert "grid-template-columns: repeat(3, minmax(8rem, 1fr))" in styles
+    assert "grid-template-columns: repeat(2, minmax(8rem, 1fr))" in styles
     assert ".footer-word text" in styles
 
 
@@ -183,13 +189,28 @@ def test_site_keeps_the_full_plain_language_method_illustration() -> None:
     page = (SITE / "index.html").read_text()
     styles = (SITE / "styles.css").read_text()
 
-    assert '<section class="method section-shell" id="method"' in page
-    assert "Test the whole robot before the update goes live." in page
-    assert "Find one update" in page
-    assert "Watch the robot work now" in page
-    assert "Try the updated software" in page
-    assert "Check that the robot still works" in page
+    assert '<section class="proof" id="method"' in page
+    assert "Try the update away from the real robot." in page
+    assert "Find the update" in page
+    assert "Create a virtual copy of the robot" in page
+    assert "Run the existing and updated software" in page
+    assert "Detect and block dangerous changes" in page
+    assert "without putting the real machine at risk" in page
     assert "minmax(26rem, 1.28fr)" in styles
+
+
+def test_action_and_supported_systems_follow_the_approved_page_order() -> None:
+    page = (SITE / "index.html").read_text()
+
+    action = page.index('<section class="action section-shell"')
+    coverage = page.index('<section class="availability section-shell"')
+    closing = page.index('<section class="closing">')
+
+    assert action < coverage < closing
+    assert "Fraeno in action" in page
+    assert "Screen recording coming soon" in page
+    assert "Supported systems" in page
+    assert "Protect the robot from dangerous software updates." in page
 
 
 def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
@@ -242,14 +263,19 @@ def test_site_has_complete_share_and_install_metadata() -> None:
 
     assert 'rel="apple-touch-icon" href="/assets/apple-touch-icon.png"' in page
     assert 'rel="manifest" href="/site.webmanifest"' in page
-    assert 'property="og:image" content="https://fraeno.com/assets/social-card.jpg"' in page
+    assert "https://fraeno.com/assets/social-card-16fc030d.jpg" in page
     assert 'name="twitter:card" content="summary_large_image"' in page
     assert manifest["name"] == "Fraeno"
     assert manifest["display"] == "browser"
     assert manifest["theme_color"] == "#ff6b2c"
     assert {icon["sizes"] for icon in manifest["icons"]} == {"192x192", "512x512"}
 
-    for name in ("apple-touch-icon.png", "icon-192.png", "icon-512.png", "social-card.jpg"):
+    for name in (
+        "apple-touch-icon.png",
+        "icon-192.png",
+        "icon-512.png",
+        "social-card-16fc030d.jpg",
+    ):
         assert (SITE / "assets" / name).is_file()
 
 
@@ -267,7 +293,7 @@ def test_structured_product_metadata_is_truthful() -> None:
     assert metadata["name"] == "Fraeno"
     assert metadata["url"] == "https://fraeno.com/"
     assert metadata["description"] == (
-        "Catch dangerous changes in robot behavior before software reaches the real robot."
+        "Fraeno catches software changes that make robots behave dangerously."
     )
     assert "offers" not in metadata
 
