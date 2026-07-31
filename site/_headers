@@ -15,6 +15,3 @@
 
 /assets/*
   Cache-Control: public, max-age=604800, immutable
-
-/favicon.svg
-  Cache-Control: public, max-age=604800, immutable

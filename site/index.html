@@ -9,8 +9,6 @@
       content="Fraeno catches software changes that make robots behave dangerously."
     />
     <link rel="canonical" href="https://fraeno.com/" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <link
       rel="preload"
@@ -71,8 +69,8 @@
         "description": "Fraeno catches software changes that make robots behave dangerously."
       }
     </script>
-    <link rel="stylesheet" href="/styles.css?v=6c079861" />
-    <script src="/site.js?v=c15a9a8a" defer></script>
+    <link rel="stylesheet" href="/styles.css?v=4f90b2bc" />
+    <script src="/site.js?v=e92d44e8" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -207,9 +205,8 @@
                 <span class="proof-moment is-next" data-proof-moment>
                   between a software update and the robot.
                 </span>
-                <span class="proof-moment" data-proof-moment>It catches changes</span>
                 <span class="proof-moment" data-proof-moment>
-                  that make the robot behave dangerously.
+                  It catches changes that make the robot behave dangerously.
                 </span>
               </h2>
             </div>
@@ -217,34 +214,34 @@
             <div class="proof-result">
               <div
                 class="trace"
-                aria-label="A dangerous update that Fraeno caught"
+                aria-label="Example: the stop button was pressed, the robot kept moving, and Fraeno blocked the update"
                 data-trace
               >
                 <div class="trace-node">
-                  <span>Sensor</span>
-                  <strong>Sent information</strong>
+                  <span>Stop button</span>
+                  <strong>Pressed</strong>
                 </div>
                 <div class="trace-line trace-line-live" aria-hidden="true"><span></span></div>
                 <div class="trace-node">
                   <span>Robot</span>
-                  <strong>Heard nothing</strong>
+                  <strong>Kept moving</strong>
                 </div>
                 <div class="trace-line trace-line-broken" aria-hidden="true"></div>
                 <div class="trace-node">
-                  <span>Movement</span>
-                  <strong>Stopped</strong>
+                  <span>Fraeno</span>
+                  <strong>Blocked the update</strong>
                 </div>
               </div>
 
               <div class="proof-footer">
                 <div>
-                  <span>Fraeno caught the problem</span>
-                  <strong>Update blocked</strong>
+                  <span>Before deployment</span>
+                  <strong>Real robot protected</strong>
                 </div>
                 <a
                   href="https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
                 >
-                  See the real run
+                  See a real Fraeno check
                   <span aria-hidden="true">↗</span>
                 </a>
               </div>
