@@ -135,8 +135,8 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'poster="/assets/robot-system-poster.webp?v=22eddc0b"' in page
     assert 'src="/assets/robot-system-loop.mp4?v=e7e40370"' in page
     assert "data-section-video" in page
-    assert 'src="/assets/fraeno-hero-loop-8e05b143.mp4"' in page
-    assert 'poster="/assets/fraeno-hero-poster-da16c61c.jpg"' in page
+    assert 'src="/assets/fraeno-hero-loop-952e20e2.mp4"' in page
+    assert 'poster="/assets/fraeno-hero-poster-fd73bfa6.jpg"' in page
     assert "data-hero-video" in page
     assert 'src="/assets/fraeno-robot-arm.webp"' in page
     assert 'href="/assets/inter-tight-latin.woff2"' in page
@@ -219,8 +219,8 @@ def test_site_bundles_original_visual_and_self_hosted_font() -> None:
     license_file = SITE / "assets" / "INTER-TIGHT-OFL.txt"
     system_video = SITE / "assets" / "robot-system-loop.mp4"
     system_poster = SITE / "assets" / "robot-system-poster.webp"
-    hero_video = SITE / "assets" / "fraeno-hero-loop-8e05b143.mp4"
-    hero_poster = SITE / "assets" / "fraeno-hero-poster-da16c61c.jpg"
+    hero_video = SITE / "assets" / "fraeno-hero-loop-952e20e2.mp4"
+    hero_poster = SITE / "assets" / "fraeno-hero-poster-fd73bfa6.jpg"
 
     assert robot.is_file()
     assert robot.stat().st_size < 100_000
