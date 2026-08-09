@@ -5,6 +5,7 @@ const hero = document.querySelector("[data-hero]");
 const heroVideo = document.querySelector("[data-hero-video]");
 const proof = document.querySelector("[data-proof]");
 const sectionVideo = document.querySelector("[data-section-video]");
+const actionVideo = document.querySelector(".action-video");
 const proofMoments = Array.from(document.querySelectorAll("[data-proof-moment]"));
 const revealItems = document.querySelectorAll("[data-reveal]");
 const methodSteps = document.querySelectorAll("[data-step]");
@@ -214,6 +215,56 @@ const configureSectionVideo = () => {
   videoObserver.observe(sectionVideo);
 };
 
+let actionVideoObserver;
+
+const configureActionVideo = () => {
+  actionVideoObserver?.disconnect();
+
+  if (!actionVideo) {
+    return;
+  }
+
+  actionVideo.controls = false;
+
+  if (reducedMotion.matches) {
+    actionVideo.pause();
+    actionVideo.currentTime = 0;
+    return;
+  }
+
+  if (!("IntersectionObserver" in window)) {
+    actionVideo.play().catch(() => {});
+    return;
+  }
+
+  actionVideoObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          actionVideo.play().catch(() => {});
+        } else {
+          actionVideo.pause();
+        }
+      });
+    },
+    { rootMargin: "80px 0px", threshold: 0.2 },
+  );
+  actionVideoObserver.observe(actionVideo);
+};
+
+const nudgeActionVideo = () => {
+  if (reducedMotion.matches || !actionVideo) {
+    return;
+  }
+  if (actionVideo.paused) {
+    actionVideo.play().catch(() => {});
+  }
+};
+
+actionVideo?.addEventListener("canplay", nudgeActionVideo);
+window.addEventListener("touchstart", nudgeActionVideo, { once: true, passive: true });
+window.addEventListener("pageshow", configureActionVideo);
+
 reducedMotion.addEventListener("change", () => {
   if (reducedMotion.matches && hero) {
     hero.style.setProperty("--pointer-x", "0px");
@@ -232,6 +283,7 @@ reducedMotion.addEventListener("change", () => {
   }
   configureHeroVideo();
   configureSectionVideo();
+  configureActionVideo();
 });
 
 window.addEventListener("scroll", onScroll, { passive: true });
@@ -241,4 +293,5 @@ window.addEventListener("resize", () => {
 });
 configureHeroVideo();
 configureSectionVideo();
+configureActionVideo();
 onScroll();
