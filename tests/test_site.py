@@ -230,7 +230,9 @@ def test_action_and_supported_systems_follow_the_approved_page_order() -> None:
 
     assert action < coverage < closing
     assert "Fraeno in action" in page
-    assert "Screen recording coming soon" in page
+    assert 'class="action-video"' in page
+    assert 'src="/assets/fraeno-demo-reel.mp4"' in page
+    assert 'poster="/assets/fraeno-demo-poster.jpg"' in page
     assert "Supported systems" in page
     assert "Protect the robot from dangerous software updates." in page
 

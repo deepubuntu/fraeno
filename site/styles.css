@@ -813,6 +813,13 @@ h1 {
   background: rgba(21, 21, 21, 0.18);
 }
 
+.action-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #f3f2ef;
+}
+
 .action-placeholder {
   display: grid;
   min-height: clamp(20rem, 52vw, 43rem);
