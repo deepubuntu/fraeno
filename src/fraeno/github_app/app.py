@@ -40,17 +40,26 @@ def request_too_large(request: Request) -> bool:
     if content_length is None:
         return False
     try:
-        return int(content_length) > MAX_REQUEST_BYTES
+        declared_length = int(content_length)
     except ValueError:
         return True
+    return declared_length < 0 or declared_length > MAX_REQUEST_BYTES
+
+
+async def limited_request_body(request: Request) -> bytes:
+    """Read a request body without buffering more than the configured limit."""
+    if request_too_large(request):
+        raise HTTPException(status_code=413, detail="Request payload is too large")
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(chunk) > MAX_REQUEST_BYTES - len(body):
+            raise HTTPException(status_code=413, detail="Request payload is too large")
+        body.extend(chunk)
+    return bytes(body)
 
 
 async def json_object(request: Request) -> dict[str, Any]:
-    if request_too_large(request):
-        raise HTTPException(status_code=413, detail="Request payload is too large")
-    body = await request.body()
-    if len(body) > MAX_REQUEST_BYTES:
-        raise HTTPException(status_code=413, detail="Request payload is too large")
+    body = await limited_request_body(request)
     try:
         payload = json.loads(body)
     except json.JSONDecodeError as error:
@@ -112,11 +121,7 @@ def create_webhook_app(
         active_settings = resolved_settings
         if active_settings is None:
             raise HTTPException(status_code=503, detail="Webhook is not configured")
-        if request_too_large(request):
-            raise HTTPException(status_code=413, detail="Webhook payload is too large")
-        body = await request.body()
-        if len(body) > MAX_REQUEST_BYTES:
-            raise HTTPException(status_code=413, detail="Webhook payload is too large")
+        body = await limited_request_body(request)
         matched_secret = verify_rotating_webhook_signature(
             body,
             request.headers.get("x-hub-signature-256"),
@@ -134,11 +139,7 @@ def create_webhook_app(
         active_enqueuer: TaskEnqueuer | None = app.state.enqueuer
         if active_settings is None or active_enqueuer is None:
             raise HTTPException(status_code=503, detail="Webhook is not configured")
-        if request_too_large(request):
-            raise HTTPException(status_code=413, detail="Webhook payload is too large")
-        body = await request.body()
-        if len(body) > MAX_REQUEST_BYTES:
-            raise HTTPException(status_code=413, detail="Webhook payload is too large")
+        body = await limited_request_body(request)
         matched_secret = verify_rotating_webhook_signature(
             body,
             request.headers.get("x-hub-signature-256"),

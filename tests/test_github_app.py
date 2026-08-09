@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import json
@@ -5,9 +6,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
+from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 
-from fraeno.github_app.app import create_webhook_app, create_worker_app
+from fraeno.github_app.app import (
+    MAX_REQUEST_BYTES,
+    create_webhook_app,
+    create_worker_app,
+    limited_request_body,
+)
 from fraeno.github_app.settings import (
     AppSettings,
     CredentialRotationWindow,
@@ -308,6 +315,95 @@ def test_credential_readiness_enforces_request_size_limit() -> None:
         )
 
     assert response.status_code == 413
+
+
+def test_chunked_request_stops_before_buffering_the_full_body() -> None:
+    chunks = [b"x" * 65_536 for _ in range(32)]
+    receive_calls = 0
+    sent_messages: list[dict[str, Any]] = []
+
+    async def receive() -> dict[str, Any]:
+        nonlocal receive_calls
+        receive_calls += 1
+        chunk = chunks.pop(0)
+        return {
+            "type": "http.request",
+            "body": chunk,
+            "more_body": bool(chunks),
+        }
+
+    async def send(message: dict[str, Any]) -> None:
+        sent_messages.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "https",
+        "path": "/webhooks/github",
+        "raw_path": b"/webhooks/github",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+        "server": ("fraeno.test", 443),
+    }
+    app = create_webhook_app(webhook_settings(), RecordingEnqueuer())
+    asyncio.run(app(scope, receive, send))
+
+    response_start = next(
+        message
+        for message in sent_messages
+        if message["type"] == "http.response.start"
+    )
+    assert response_start["status"] == 413
+    assert receive_calls == 16
+    assert len(chunks) == 16
+
+
+@pytest.mark.parametrize("declared_length", ["-1", "invalid", "1000001"])
+def test_invalid_or_oversized_declared_length_rejects_without_reading(
+    declared_length: str,
+) -> None:
+    receive_calls = 0
+
+    async def receive() -> dict[str, Any]:
+        nonlocal receive_calls
+        receive_calls += 1
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    request = Request(
+        {
+            "type": "http",
+            "headers": [(b"content-length", declared_length.encode())],
+        },
+        receive,
+    )
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(limited_request_body(request))
+
+    assert raised.value.status_code == 413
+    assert receive_calls == 0
+
+
+def test_chunked_request_accepts_the_exact_limit() -> None:
+    chunks = [b"x" * 400_000, b"y" * 600_000]
+
+    async def receive() -> dict[str, Any]:
+        chunk = chunks.pop(0)
+        return {
+            "type": "http.request",
+            "body": chunk,
+            "more_body": bool(chunks),
+        }
+
+    request = Request({"type": "http", "headers": []}, receive)
+    body = asyncio.run(limited_request_body(request))
+
+    assert len(body) == MAX_REQUEST_BYTES
+    assert body[:1] == b"x"
+    assert body[-1:] == b"y"
+    assert chunks == []
 
 
 def test_worker_processes_and_deduplicates_a_delivery() -> None:
