@@ -40,7 +40,7 @@ function emailShell(heading, bodyHtml, footerLine) {
     '<tr><td style="padding:24px 6px 0;text-align:center;">' +
     `<p style="margin:0 0 8px;font-family:${EMAIL_FONT};font-size:13px;line-height:1.6;color:#92918d;">${footerLine}</p>` +
     `<p style="margin:0;font-family:${EMAIL_FONT};font-size:13px;line-height:1.6;color:#92918d;">` +
-    "DeepUbuntu Labs &nbsp;&middot;&nbsp; Talladega, Alabama &nbsp;&middot;&nbsp; " +
+    "DeepUbuntu Labs &nbsp;&middot;&nbsp; San Francisco, CA &nbsp;&middot;&nbsp; " +
     '<a href="https://fraeno.com/" style="color:#92918d;">fraeno.com</a>' +
     "</p></td></tr>" +
     "</table></div>"
@@ -194,44 +194,48 @@ export default {
     }
 
     try {
-      const firstName = escapeHtml(name.split(/\s+/)[0]);
       const confirmationBody =
-        emailParagraph(`Hi ${firstName},`) +
+        emailParagraph("Hi there,") +
         emailParagraph(
-          "Thanks for reaching out. Your request has landed safely, and a " +
-            "real person reads every single one."
+          "Thanks for reaching out. Your request has been received and we " +
+            "read every single one."
         ) +
         emailParagraph(
-          "Fraeno is built by a small team on a simple belief: no software " +
-            "update should ever make a robot dangerous. Conversations like " +
-            "yours shape what we build next, so we are genuinely glad you " +
-            "wrote in."
+          "Fraeno is built by a small team on a simple belief that " +
+            "robots can be dangerous, even deadly, and we want to make sure " +
+            "bad code doesn't accidentally cause that. Conversations like " +
+            "yours shape what we build next, so we genuinely look forward " +
+            "to talking to you."
         ) +
         emailParagraph(
           "You will hear from us shortly. If you would like to talk sooner, " +
-            "pick a time that suits you and we will meet you there."
+            "please pick a time that works for you and we will meet you " +
+            "there!"
         ) +
         emailButton(
           "Book a call",
           "https://calendar.app.google/fB6AtdB5FVSs8YoA9"
         ) +
-        emailParagraph("Talk soon,<br>Thabhelo, DeepUbuntu Labs");
+        emailParagraph("Talk soon,<br>Thabhelo");
       await env.EMAIL.send({
         to: email,
         from: { email: FROM_ADDRESS, name: "Fraeno" },
         replyTo: { email: NOTIFY_ADDRESS, name: "Thabhelo Duve" },
         subject: "We received your Fraeno access request",
         text:
-          `Hi ${name.split(/\s+/)[0]},\n\n` +
-          "Thanks for reaching out. Your request has landed safely, and a " +
-          "real person reads every single one.\n\n" +
-          "Fraeno is built by a small team on a simple belief: no software " +
-          "update should ever make a robot dangerous. Conversations like " +
-          "yours shape what we build next, so we are genuinely glad you " +
-          "wrote in.\n\n" +
+          "Hi there,\n\n" +
+          "Thanks for reaching out. Your request has been received and we " +
+          "read every single one.\n\n" +
+          "Fraeno is built by a small team on a simple belief that " +
+          "robots can be dangerous, even deadly, and we want to make sure " +
+          "bad code doesn't accidentally cause that. Conversations like " +
+          "yours shape what we build next, so we genuinely look forward " +
+          "to talking to you.\n\n" +
           "You will hear from us shortly. If you would like to talk sooner, " +
-          "book a call: https://calendar.app.google/fB6AtdB5FVSs8YoA9\n\n" +
-          "Talk soon,\nThabhelo, DeepUbuntu Labs\n",
+          "please pick a time that works for you and we will meet you " +
+          "there! Book a call: " +
+          "https://calendar.app.google/fB6AtdB5FVSs8YoA9\n\n" +
+          "Talk soon,\nThabhelo\n",
         html: emailShell("We got your request", confirmationBody, 
           "You are receiving this one-time message because you requested access at fraeno.com."
         ),
