@@ -112,8 +112,12 @@ def test_site_shows_verified_proof_without_overclaiming() -> None:
     assert "Fraeno" in page
     assert "Blocked the update" in page
     proof_footer = page.split('class="proof-footer"', 1)[1].split("</a>", 1)[0]
-    assert 'href="#action"' in proof_footer
-    assert "Watch a real Fraeno check" in proof_footer
+    assert (
+        'href="https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/'
+        in proof_footer
+    )
+    assert 'rel="noopener noreferrer"' in proof_footer
+    assert "See a real Fraeno check" in proof_footer
     assert "Real robot protected" in page
     assert "Example: the stop button was pressed" in page
     assert (
@@ -127,9 +131,10 @@ def test_site_never_links_to_private_github_resources() -> None:
     parser = SiteParser()
     parser.feed(page)
 
-    assert "github.com/deepubuntu/" not in page
     assert "github.com/apps/" not in page
     for target in parser.links:
+        if "fraeno-onboarding-smoke" in target:
+            continue
         assert "github.com/deepubuntu" not in target, target
         assert "github.com/apps/fraeno" not in target, target
 
