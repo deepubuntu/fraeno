@@ -295,3 +295,88 @@ configureHeroVideo();
 configureSectionVideo();
 configureActionVideo();
 onScroll();
+
+const contactOverlay = document.querySelector("[data-contact-overlay]");
+const contactForm = document.querySelector("[data-contact-form]");
+const contactStatus = document.querySelector("[data-contact-status]");
+let contactOpenedAt = 0;
+
+function openContact() {
+  contactOverlay.hidden = false;
+  document.body.style.overflow = "hidden";
+  contactOpenedAt = Date.now();
+  const first = contactForm.querySelector('input[name="name"]');
+  if (first) {
+    first.focus();
+  }
+}
+
+function closeContact() {
+  contactOverlay.hidden = true;
+  document.body.style.overflow = "";
+}
+
+for (const trigger of document.querySelectorAll("[data-contact-open]")) {
+  trigger.addEventListener("click", openContact);
+}
+
+if (contactOverlay) {
+  contactOverlay.addEventListener("click", (event) => {
+    if (event.target === contactOverlay) {
+      closeContact();
+    }
+  });
+  const closeButton = contactOverlay.querySelector("[data-contact-close]");
+  if (closeButton) {
+    closeButton.addEventListener("click", closeContact);
+  }
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !contactOverlay.hidden) {
+      closeContact();
+    }
+  });
+}
+
+if (contactForm) {
+  contactForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = contactForm.querySelector(".contact-submit");
+    const fields = new FormData(contactForm);
+    contactStatus.textContent = "";
+    contactStatus.className = "contact-status";
+    submit.disabled = true;
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: fields.get("name"),
+          email: fields.get("email"),
+          company: fields.get("company"),
+          message: fields.get("message"),
+          website: fields.get("website"),
+          dwell_ms: Date.now() - contactOpenedAt,
+        }),
+      });
+      const result = await response.json();
+      if (result.ok) {
+        contactForm.reset();
+        contactStatus.textContent =
+          "Request sent. We reply within one business day.";
+        contactStatus.className = "contact-status is-success";
+      } else {
+        contactStatus.textContent =
+          "That did not go through: " +
+          result.reason +
+          ". You can also email thabhelo@deepubuntu.com.";
+        contactStatus.className = "contact-status is-error";
+      }
+    } catch {
+      contactStatus.textContent =
+        "The request failed to send. You can also email thabhelo@deepubuntu.com.";
+      contactStatus.className = "contact-status is-error";
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}

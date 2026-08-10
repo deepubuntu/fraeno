@@ -133,10 +133,30 @@ def test_site_never_links_to_private_github_resources() -> None:
         assert "github.com/deepubuntu" not in target, target
         assert "github.com/apps/fraeno" not in target, target
 
-    assert page.count('href="mailto:thabhelo@deepubuntu.com?subject=Fraeno%20access"') == 3
-    assert page.count('href="mailto:thabhelo@deepubuntu.com"') == 1
+    assert "mailto:" not in page
+    assert page.count("data-contact-open") == 4
     assert "Request access" in page
     assert "Install Fraeno" not in page
+
+
+def test_site_submits_access_requests_through_the_contact_worker() -> None:
+    page = (SITE / "index.html").read_text()
+    script = (SITE / "site.js").read_text()
+
+    assert 'data-contact-overlay' in page
+    assert 'role="dialog"' in page
+    assert 'data-contact-form' in page
+    assert 'name="website"' in page
+    assert 'tabindex="-1"' in page
+    assert '"/api/contact"' in script
+    assert "dwell_ms" in script
+    assert "thabhelo@deepubuntu.com" in script
+    worker = Path(__file__).parents[1] / "contact-worker" / "src" / "index.js"
+    assert worker.exists()
+    worker_source = worker.read_text()
+    assert "MINIMUM_DWELL_MS" in worker_source
+    assert "payload.website" in worker_source
+    assert "escapeHtml" in worker_source
 
 
 def test_site_uses_product_motion_without_decorative_media() -> None:
@@ -162,7 +182,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
     assert "data-trace" in page
-    assert 'src="/site.js?v=2798326e"' in page
+    assert 'src="/site.js?v=ab0eb265"' in page
     assert page.count("A bad update can make a robot move the wrong way") == 1
     why_section = page.split('<section class="system-intro section-shell"', 1)[1].split(
         '<section class="proof"', 1
@@ -266,7 +286,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
-    assert 'href="/styles.css?v=5c38e926"' in page
+    assert 'href="/styles.css?v=4bc6a0ca"' in page
     assert ".hero-support .round-link" in styles
     assert "padding-top: clamp(11.5rem, 22vh, 14rem)" in styles
     assert "padding-top: 11rem" in styles
