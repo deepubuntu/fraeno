@@ -365,7 +365,7 @@ if (contactForm) {
       if (result.ok) {
         contactForm.reset();
         contactStatus.textContent =
-          "Request sent. We reply within one business day.";
+          "Request sent. We will be in touch shortly.";
         contactStatus.className = "contact-status is-success";
         booking.hidden = false;
       } else {
