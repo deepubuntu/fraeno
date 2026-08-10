@@ -252,3 +252,10 @@ gcloud artifacts repositories set-cleanup-policies fraeno-control-plane \
 
 Issue 19 can close only after the runner and control-plane release workflows
 both complete successfully and their evidence artifacts are verified.
+
+## Release history
+
+- `0.2.0` — first published runner: multi-architecture manifest list
+  (`linux/amd64`, `linux/arm64`) from the digest-pinned ROS 2 Humble base,
+  released alongside GHCR digest resolution, live rosdep discovery, and
+  delivery-identity correlation for dispatched validation runs.
