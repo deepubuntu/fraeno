@@ -69,8 +69,8 @@
         "description": "Fraeno catches software changes that make robots behave dangerously."
       }
     </script>
-    <link rel="stylesheet" href="/styles.css?v=5c38e926" />
-    <script src="/site.js?v=2798326e" defer></script>
+    <link rel="stylesheet" href="/styles.css?v=4bc6a0ca" />
+    <script src="/site.js?v=ab0eb265" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -94,9 +94,9 @@
       <nav id="primary-navigation" aria-label="Primary navigation" data-navigation>
         <a href="#why">Why it matters</a>
         <a href="#action">Fraeno in action</a>
-        <a class="nav-action" href="mailto:thabhelo@deepubuntu.com?subject=Fraeno%20access">
+        <button class="nav-action" type="button" data-contact-open>
           Request access
-        </a>
+        </button>
       </nav>
     </header>
 
@@ -327,10 +327,10 @@
         <div class="closing-inner section-shell" data-reveal>
           <p>Fraeno</p>
           <h2>Protect the robot from dangerous software updates.</h2>
-          <a class="install-link" href="mailto:thabhelo@deepubuntu.com?subject=Fraeno%20access">
+          <button class="install-link" type="button" data-contact-open>
             Request access
             <span aria-hidden="true">→</span>
-          </a>
+          </button>
         </div>
       </section>
     </main>
@@ -356,8 +356,8 @@
           </div>
           <div>
             <span>Get started</span>
-            <a href="mailto:thabhelo@deepubuntu.com?subject=Fraeno%20access">Request access</a>
-            <a href="mailto:thabhelo@deepubuntu.com">Contact</a>
+            <button type="button" data-contact-open>Request access</button>
+            <button type="button" data-contact-open>Contact</button>
           </div>
         </nav>
       </div>
@@ -368,5 +368,54 @@
         </svg>
       </div>
     </footer>
+
+    <div class="contact-overlay" data-contact-overlay hidden>
+      <section
+        class="contact-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="contact-title"
+      >
+        <button class="contact-close" type="button" data-contact-close aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <p class="contact-kicker">Fraeno</p>
+        <h2 id="contact-title">Request access</h2>
+        <p class="contact-support">
+          Tell us about your robots. We reply from thabhelo@deepubuntu.com.
+        </p>
+        <form data-contact-form novalidate>
+          <input
+            class="contact-trap"
+            type="text"
+            name="website"
+            tabindex="-1"
+            autocomplete="off"
+            aria-hidden="true"
+          />
+          <label>
+            Name
+            <input type="text" name="name" required maxlength="120" autocomplete="name" />
+          </label>
+          <label>
+            Work email
+            <input type="email" name="email" required maxlength="254" autocomplete="email" />
+          </label>
+          <label>
+            Company
+            <input type="text" name="company" maxlength="200" autocomplete="organization" />
+          </label>
+          <label>
+            What are you deploying?
+            <textarea name="message" required minlength="10" maxlength="4000" rows="4"></textarea>
+          </label>
+          <button class="contact-submit" type="submit">
+            Send request
+            <span aria-hidden="true">→</span>
+          </button>
+          <p class="contact-status" data-contact-status role="status"></p>
+        </form>
+      </section>
+    </div>
   </body>
 </html>
