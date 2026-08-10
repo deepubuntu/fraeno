@@ -8,7 +8,7 @@ const FIELD_LIMITS = {
   name: { min: 1, max: 120 },
   email: { min: 5, max: 254 },
   company: { min: 0, max: 200 },
-  message: { min: 10, max: 4000 },
+  message: { min: 0, max: 4000 },
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -88,14 +88,32 @@ export default {
     const name = payload.name.trim();
     const email = payload.email.trim();
     const company = (payload.company || "").trim();
-    const message = payload.message.trim();
+    const message = (payload.message || "").trim();
+    const wantsUpdates = payload.updates === true;
+
+    const key = email.toLowerCase();
+    const existing = await env.CONTACTS.get(key, "json");
+    await env.CONTACTS.put(
+      key,
+      JSON.stringify({
+        name,
+        email,
+        company,
+        updates: wantsUpdates || (existing ? existing.updates === true : false),
+        last_message: message,
+        submissions: existing ? (existing.submissions || 1) + 1 : 1,
+        first_seen: existing ? existing.first_seen : new Date().toISOString(),
+        last_seen: new Date().toISOString(),
+      })
+    );
     const subject = `Fraeno access request from ${name}`;
     const lines = [
       `Name: ${name}`,
       `Email: ${email}`,
       company ? `Company: ${company}` : null,
-      "",
-      message,
+      wantsUpdates ? "Opted into product updates" : null,
+      message ? "" : null,
+      message || null,
     ].filter((line) => line !== null);
 
     try {

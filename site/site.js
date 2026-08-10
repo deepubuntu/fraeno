@@ -357,6 +357,7 @@ if (contactForm) {
           company: fields.get("company"),
           message: fields.get("message"),
           website: fields.get("website"),
+          updates: fields.get("updates") === "on",
           dwell_ms: Date.now() - contactOpenedAt,
         }),
       });

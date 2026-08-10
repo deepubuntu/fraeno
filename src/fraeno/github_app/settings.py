@@ -81,6 +81,14 @@ class CredentialRotationWindow:
         return self.started_at <= observed_at < self.previous_valid_until
 
 
+def _login_tuple(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw = os.environ.get(name, "")
+    entries = tuple(
+        sorted({item.strip().lower() for item in raw.split(",") if item.strip()})
+    )
+    return entries or default
+
+
 def _positive_integer(name: str, default: int) -> int:
     raw_value = os.environ.get(name, str(default)).strip()
     try:
@@ -102,6 +110,7 @@ class AppSettings:
     github_api_url: str = "https://api.github.com"
     github_api_version: str = "2026-03-10"
     check_name: str = "Fraeno / robot integration"
+    approved_installation_logins: tuple[str, ...] = ("deepubuntu",)
     max_delivery_attempts: int = 5
     delivery_stale_seconds: int = 900
     run_stale_seconds: int = 900
@@ -170,6 +179,9 @@ class AppSettings:
             ),
             replay_audit_retention_days=_positive_integer(
                 "FRAENO_REPLAY_AUDIT_RETENTION_DAYS", 90
+            ),
+            approved_installation_logins=_login_tuple(
+                "FRAENO_APPROVED_INSTALLATION_LOGINS", ("deepubuntu",)
             ),
         )
 

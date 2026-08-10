@@ -182,7 +182,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
     assert "data-trace" in page
-    assert 'src="/site.js?v=0604dcec"' in page
+    assert 'src="/site.js?v=3a6da4b5"' in page
     assert page.count("A bad update can make a robot move the wrong way") == 1
     why_section = page.split('<section class="system-intro section-shell"', 1)[1].split(
         '<section class="proof"', 1
@@ -286,7 +286,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
-    assert 'href="/styles.css?v=59bc4b05"' in page
+    assert 'href="/styles.css?v=9e7c2da1"' in page
     assert ".hero-support .round-link" in styles
     assert "padding-top: clamp(11.5rem, 22vh, 14rem)" in styles
     assert "padding-top: 11rem" in styles
@@ -424,5 +424,22 @@ def test_site_ships_discovery_and_privacy_furniture() -> None:
     assert "https://fraeno.com/privacy.html" in sitemap
     assert "https://fraeno.com/" in llms
     assert "sets no" in privacy and "cookies" in privacy
+    assert "legal-wordmark" in privacy
+    assert "Product updates" in privacy
     assert "thabhelo@deepubuntu.com" in privacy
     assert "max-width: 70rem" in styles
+
+
+def test_site_contact_form_keeps_message_optional_with_update_consent() -> None:
+    page = (SITE / "index.html").read_text()
+    script = (SITE / "site.js").read_text()
+    worker = (
+        Path(__file__).parents[1] / "contact-worker" / "src" / "index.js"
+    ).read_text()
+
+    assert "minlength" not in page
+    assert 'name="updates"' in page
+    assert '(optional)' in page
+    assert 'fields.get("updates") === "on"' in script
+    assert "env.CONTACTS.put" in worker
+    assert "message: { min: 0, max: 4000 }" in worker

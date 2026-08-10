@@ -3,6 +3,9 @@
   "main": "src/index.js",
   "compatibility_date": "2026-08-01",
   "send_email": [{ "name": "EMAIL" }],
+  "kv_namespaces": [
+    { "binding": "CONTACTS", "id": "ec99caa03be54a87b0831a587ded27d9" }
+  ],
   "routes": [
     { "pattern": "fraeno.com/api/contact", "zone_name": "fraeno.com" },
     { "pattern": "www.fraeno.com/api/contact", "zone_name": "fraeno.com" }

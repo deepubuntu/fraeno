@@ -72,6 +72,7 @@ correlation state. It requires:
 FRAENO_SERVICE_MODE=worker
 FRAENO_GITHUB_APP_ID
 FRAENO_GITHUB_PRIVATE_KEY
+FRAENO_APPROVED_INSTALLATION_LOGINS=deepubuntu
 FRAENO_GITHUB_WORKFLOW_FILE=fraeno-validation.yml
 FRAENO_MAX_DELIVERY_ATTEMPTS=5
 FRAENO_DELIVERY_STALE_SECONDS=900
@@ -96,6 +97,12 @@ service can enqueue tasks but cannot invoke the worker directly. Never commit
 the PEM private key or webhook secret.
 
 The configured Cloud Tasks maximum attempts should equal
+`FRAENO_APPROVED_INSTALLATION_LOGINS` is the comma-separated list of GitHub
+account logins admitted to the private beta. Pull requests from any other
+installation receive a neutral "Fraeno is in private beta" check and no
+validation is dispatched. Set the single value `*` to admit every
+installation.
+
 `FRAENO_MAX_DELIVERY_ATTEMPTS`. Fraeno marks the last failed attempt as a dead
 letter and returns success to Cloud Tasks, which prevents an unbounded retry
 loop.
