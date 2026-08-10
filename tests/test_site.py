@@ -102,7 +102,7 @@ def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None
     assert "brand-mark" not in (SITE / "index.html").read_text()
 
 
-def test_site_shows_verified_external_proof_without_overclaiming() -> None:
+def test_site_shows_verified_proof_without_overclaiming() -> None:
     page = (SITE / "index.html").read_text()
 
     assert "Stop button" in page
@@ -111,16 +111,32 @@ def test_site_shows_verified_external_proof_without_overclaiming() -> None:
     assert "Kept moving" in page
     assert "Fraeno" in page
     assert "Blocked the update" in page
-    assert (
-        "https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
-        in page
-    )
+    proof_footer = page.split('class="proof-footer"', 1)[1].split("</a>", 1)[0]
+    assert 'href="#action"' in proof_footer
+    assert "Watch a real Fraeno check" in proof_footer
     assert "Real robot protected" in page
     assert "Example: the stop button was pressed" in page
     assert (
         "Fraeno checks the robot actions you choose. It cannot promise every possible action is"
         in page
     )
+
+
+def test_site_never_links_to_private_github_resources() -> None:
+    page = (SITE / "index.html").read_text()
+    parser = SiteParser()
+    parser.feed(page)
+
+    assert "github.com/deepubuntu/" not in page
+    assert "github.com/apps/" not in page
+    for target in parser.links:
+        assert "github.com/deepubuntu" not in target, target
+        assert "github.com/apps/fraeno" not in target, target
+
+    assert page.count('href="mailto:thabhelo@deepubuntu.com?subject=Fraeno%20access"') == 3
+    assert page.count('href="mailto:thabhelo@deepubuntu.com"') == 1
+    assert "Request access" in page
+    assert "Install Fraeno" not in page
 
 
 def test_site_uses_product_motion_without_decorative_media() -> None:
