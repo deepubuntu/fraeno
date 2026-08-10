@@ -134,7 +134,7 @@ def test_site_never_links_to_private_github_resources() -> None:
         assert "github.com/apps/fraeno" not in target, target
 
     assert "mailto:" not in page
-    assert page.count("data-contact-open") == 4
+    assert page.count("data-contact-open") == 3
     assert "Request access" in page
     assert "Install Fraeno" not in page
 
@@ -286,7 +286,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
-    assert 'href="/styles.css?v=9e7c2da1"' in page
+    assert 'href="/styles.css?v=0c5fe2c7"' in page
     assert ".hero-support .round-link" in styles
     assert "padding-top: clamp(11.5rem, 22vh, 14rem)" in styles
     assert "padding-top: 11rem" in styles
