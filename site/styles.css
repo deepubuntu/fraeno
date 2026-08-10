@@ -144,7 +144,8 @@ p {
   gap: 0.2rem;
 }
 
-.site-header nav a {
+.site-header nav a,
+.site-header nav .nav-action {
   padding: 0.6rem 0.8rem;
   border-radius: 999px;
   color: #50504e;
@@ -1204,7 +1205,8 @@ h1 {
     transform: translateY(0);
   }
 
-  .site-header nav a {
+  .site-header nav a,
+  .site-header nav .nav-action {
     padding: 0.78rem 0.85rem;
   }
 
@@ -1556,15 +1558,13 @@ h1 {
   }
 }
 
-.nav-action,
-.install-link {
-  font: inherit;
-  cursor: pointer;
-}
-
 button.nav-action,
 button.install-link {
+  font-family: inherit;
+  line-height: inherit;
   border: none;
+  background: var(--black);
+  cursor: pointer;
 }
 
 .footer-links button {
