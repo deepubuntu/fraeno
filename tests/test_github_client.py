@@ -24,19 +24,37 @@ def client_with(handler: httpx.MockTransport) -> GitHubClient:
 
 
 @pytest.mark.anyio
-async def test_workflow_dispatch_carries_recovery_identity() -> None:
+async def test_workflow_dispatch_correlates_the_run_after_an_empty_response() -> None:
+    listed = 0
+
     async def respond(request: httpx.Request) -> httpx.Response:
-        payload = json.loads(request.content)
-        assert payload["inputs"]["delivery_id"] == "delivery-7"
-        assert payload["inputs"]["head_sha"] == "candidate"
-        assert payload["inputs"]["base_repository"] == "deepubuntu/fraeno"
-        assert payload["inputs"]["head_repository"] == "contributor/fraeno"
+        nonlocal listed
+        if request.method == "POST":
+            payload = json.loads(request.content)
+            assert payload["inputs"]["delivery_id"] == "delivery-7"
+            assert payload["inputs"]["head_sha"] == "candidate"
+            assert payload["inputs"]["base_repository"] == "deepubuntu/fraeno"
+            assert payload["inputs"]["head_repository"] == "contributor/fraeno"
+            return httpx.Response(204)
+        listed += 1
+        if listed == 1:
+            return httpx.Response(200, json={"workflow_runs": []})
         return httpx.Response(
             200,
-            json={"workflow_run_id": 300, "html_url": "https://github.test/run/300"},
+            json={
+                "workflow_runs": [
+                    {
+                        "id": 300,
+                        "display_title": "Fraeno delivery-7",
+                        "html_url": "https://github.test/run/300",
+                        "status": "queued",
+                    }
+                ]
+            },
         )
 
     client = client_with(httpx.MockTransport(respond))
+    client.dispatch_poll_delays = (0.0, 0.0)
     run = await client.dispatch_workflow(
         "deepubuntu/fraeno",
         "main",
@@ -52,6 +70,34 @@ async def test_workflow_dispatch_carries_recovery_identity() -> None:
     await client.close()
 
     assert run.id == 300
+    assert listed == 2
+
+
+@pytest.mark.anyio
+async def test_workflow_dispatch_raises_retryable_when_the_run_never_appears() -> None:
+    async def respond(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            return httpx.Response(204)
+        return httpx.Response(200, json={"workflow_runs": []})
+
+    client = client_with(httpx.MockTransport(respond))
+    client.dispatch_poll_delays = (0.0, 0.0)
+    with pytest.raises(GitHubApiError) as error:
+        await client.dispatch_workflow(
+            "deepubuntu/fraeno",
+            "main",
+            "token",
+            base_sha="baseline",
+            head_sha="candidate",
+            base_repository="deepubuntu/fraeno",
+            head_repository="contributor/fraeno",
+            pull_request_number=7,
+            check_run_id=200,
+            external_id="fraeno:delivery-7",
+        )
+    await client.close()
+
+    assert error.value.retryable is True
 
 
 @pytest.mark.anyio

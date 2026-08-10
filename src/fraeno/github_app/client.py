@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
@@ -60,6 +61,8 @@ MAX_REPORT_BYTES = 2_000_000
 
 
 class GitHubClient:
+    dispatch_poll_delays: tuple[float, ...] = (0.0, 1.0, 2.0, 4.0, 8.0)
+
     def __init__(
         self,
         settings: AppSettings,
@@ -164,7 +167,8 @@ class GitHubClient:
         check_run_id: int,
         external_id: str,
     ) -> WorkflowRun:
-        response = await self._request(
+        delivery_id = external_id.removeprefix("fraeno:")
+        await self._request(
             "POST",
             f"/repos/{repository}/actions/workflows/"
             f"{self.settings.workflow_file}/dispatches",
@@ -178,13 +182,22 @@ class GitHubClient:
                     "head_repository": head_repository,
                     "pull_request_number": str(pull_request_number),
                     "check_run_id": str(check_run_id),
-                    "delivery_id": external_id.removeprefix("fraeno:"),
+                    "delivery_id": delivery_id,
                 },
             },
         )
-        return WorkflowRun(
-            id=int(response["workflow_run_id"]),
-            html_url=str(response["html_url"]),
+        for delay in self.dispatch_poll_delays:
+            if delay:
+                await asyncio.sleep(delay)
+            run = await self.find_workflow_run(
+                repository, installation_token, delivery_id
+            )
+            if run is not None:
+                return run
+        raise GitHubApiError(
+            "GitHub accepted the workflow dispatch but the Fraeno run "
+            "did not appear in time",
+            retryable=True,
         )
 
     async def find_workflow_run(
