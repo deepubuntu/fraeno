@@ -20,6 +20,44 @@ function reject(status, reason) {
   });
 }
 
+const EMAIL_FONT =
+  "'Inter Tight', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+
+function emailShell(heading, bodyHtml) {
+  return (
+    '<div style="margin:0;padding:32px 16px;background-color:#f3f2ef;">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">' +
+    '<tr><td style="padding:0 4px 14px;">' +
+    `<span style="font-family:${EMAIL_FONT};font-size:19px;font-weight:600;color:#151515;">fraeno</span>` +
+    "</td></tr>" +
+    '<tr><td style="background-color:#ffffff;border:1px solid rgba(21,21,21,0.13);border-top:3px solid #ff6333;border-radius:14px;padding:28px 28px 24px;">' +
+    `<h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:20px;line-height:1.25;color:#151515;">${heading}</h1>` +
+    bodyHtml +
+    "</td></tr>" +
+    '<tr><td style="padding:16px 4px 0;">' +
+    `<p style="margin:0;font-family:${EMAIL_FONT};font-size:12px;line-height:1.5;color:#92918d;">` +
+    "© 2026 DeepUbuntu Labs · " +
+    '<a href="https://fraeno.com/" style="color:#92918d;">fraeno.com</a>' +
+    "</p></td></tr>" +
+    "</table></div>"
+  );
+}
+
+function emailRow(label, value) {
+  return (
+    `<p style="margin:0 0 6px;font-family:${EMAIL_FONT};font-size:14px;line-height:1.6;color:#151515;">` +
+    `<span style="color:#666663;">${label}</span>&nbsp;&nbsp;${value}</p>`
+  );
+}
+
+function emailParagraph(text) {
+  return (
+    `<p style="margin:14px 0 0;font-family:${EMAIL_FONT};font-size:14px;line-height:1.7;color:#151515;">` +
+    text +
+    "</p>"
+  );
+}
+
 function escapeHtml(value) {
   return value
     .replaceAll("&", "&amp;")
@@ -116,6 +154,14 @@ export default {
       message || null,
     ].filter((line) => line !== null);
 
+    const notificationBody =
+      emailRow("Name", escapeHtml(name)) +
+      emailRow("Email", escapeHtml(email)) +
+      (company ? emailRow("Company", escapeHtml(company)) : "") +
+      (wantsUpdates ? emailRow("Updates", "Opted in") : "") +
+      (message
+        ? emailParagraph(escapeHtml(message).replaceAll("\n", "<br>"))
+        : "");
     try {
       await env.EMAIL.send({
         to: NOTIFY_ADDRESS,
@@ -123,16 +169,38 @@ export default {
         replyTo: { email, name },
         subject,
         text: lines.join("\n"),
-        html: [
-          `<p><strong>Name:</strong> ${escapeHtml(name)}</p>`,
-          `<p><strong>Email:</strong> ${escapeHtml(email)}</p>`,
-          company ? `<p><strong>Company:</strong> ${escapeHtml(company)}</p>` : "",
-          `<p>${escapeHtml(message).replaceAll("\n", "<br>")}</p>`,
-        ].join(""),
+        html: emailShell("New access request", notificationBody),
       });
     } catch (error) {
       console.log(`contact send failed: ${error}`);
       return reject(502, "the message could not be delivered; email thabhelo@deepubuntu.com directly");
+    }
+
+    try {
+      const confirmationBody =
+        emailParagraph(
+          "Thanks for your interest in Fraeno. Your request is in and a " +
+            "reply is on its way within one business day."
+        ) +
+        emailParagraph(
+          "Want to talk sooner? " +
+            '<a href="https://calendar.app.google/fB6AtdB5FVSs8YoA9" ' +
+            'style="color:#ff6333;">Book a call</a>.'
+        );
+      await env.EMAIL.send({
+        to: email,
+        from: { email: FROM_ADDRESS, name: "Fraeno" },
+        replyTo: { email: NOTIFY_ADDRESS, name: "Thabhelo Duve" },
+        subject: "We received your Fraeno access request",
+        text:
+          "Thanks for your interest in Fraeno. Your request is in and a " +
+          "reply is on its way within one business day.\n\n" +
+          "Want to talk sooner? Book a call: " +
+          "https://calendar.app.google/fB6AtdB5FVSs8YoA9\n",
+        html: emailShell("Request received", confirmationBody),
+      });
+    } catch (error) {
+      console.log(`confirmation send failed: ${error}`);
     }
 
     return new Response(JSON.stringify({ ok: true }), {

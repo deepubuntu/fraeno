@@ -348,24 +348,29 @@ def test_site_bundles_original_visual_and_self_hosted_font() -> None:
     assert hero_poster.stat().st_size < 100_000
 
 
-def test_site_has_share_metadata_without_the_retired_favicons() -> None:
+def test_site_has_share_metadata_with_the_fraeno_icon_set() -> None:
     page = (SITE / "index.html").read_text()
+    privacy = (SITE / "privacy.html").read_text()
     manifest = json.loads((SITE / "site.webmanifest").read_text())
 
-    assert 'rel="icon"' not in page
-    assert 'rel="apple-touch-icon"' not in page
+    for document in (page, privacy):
+        assert 'rel="icon" href="/favicon.ico"' in document
+        assert 'rel="apple-touch-icon" href="/assets/apple-touch-icon.png"' in document
     assert 'rel="manifest" href="/site.webmanifest"' in page
     assert "https://fraeno.com/assets/social-card-16fc030d.jpg" in page
     assert 'name="twitter:card" content="summary_large_image"' in page
     assert manifest["name"] == "Fraeno"
     assert manifest["display"] == "browser"
     assert manifest["theme_color"] == "#ff6b2c"
-    assert "icons" not in manifest
+    assert [icon["src"] for icon in manifest["icons"]] == [
+        "/assets/icon-192.png",
+        "/assets/icon-512.png",
+    ]
 
-    for name in ("apple-touch-icon.png", "icon-192.png", "icon-512.png"):
-        assert not (SITE / "assets" / name).exists()
-
-    assert not (SITE / "favicon.svg").exists()
+    icon_names = ("favicon-32.png", "apple-touch-icon.png", "icon-192.png", "icon-512.png")
+    for name in icon_names:
+        assert (SITE / "assets" / name).is_file()
+    assert (SITE / "favicon.ico").is_file()
     assert (SITE / "assets" / "social-card-16fc030d.jpg").is_file()
 
 
