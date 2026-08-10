@@ -182,7 +182,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
     assert "data-trace" in page
-    assert 'src="/site.js?v=ab0eb265"' in page
+    assert 'src="/site.js?v=0604dcec"' in page
     assert page.count("A bad update can make a robot move the wrong way") == 1
     why_section = page.split('<section class="system-intro section-shell"', 1)[1].split(
         '<section class="proof"', 1
@@ -286,7 +286,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
-    assert 'href="/styles.css?v=84c451e2"' in page
+    assert 'href="/styles.css?v=59bc4b05"' in page
     assert ".hero-support .round-link" in styles
     assert "padding-top: clamp(11.5rem, 22vh, 14rem)" in styles
     assert "padding-top: 11rem" in styles
@@ -397,3 +397,32 @@ def test_structured_product_metadata_is_truthful() -> None:
         hashlib.sha256(raw_match.group(1).encode()).digest()
     ).decode()
     assert f"'sha256-{digest}'" in headers
+
+
+def test_site_offers_booking_after_a_successful_request() -> None:
+    page = (SITE / "index.html").read_text()
+    script = (SITE / "site.js").read_text()
+
+    assert 'data-contact-book' in page
+    assert 'href="https://calendar.app.google/fB6AtdB5FVSs8YoA9"' in page
+    assert 'rel="noopener noreferrer"' in page
+    assert "booking.hidden = false" in script
+
+
+def test_site_ships_discovery_and_privacy_furniture() -> None:
+    page = (SITE / "index.html").read_text()
+    robots = (SITE / "robots.txt").read_text()
+    sitemap = (SITE / "sitemap.xml").read_text()
+    llms = (SITE / "llms.txt").read_text()
+    privacy = (SITE / "privacy.html").read_text()
+    styles = (SITE / "styles.css").read_text()
+
+    assert 'href="/privacy.html"' in page
+    assert "ai-train=no" in robots
+    assert "Sitemap: https://fraeno.com/sitemap.xml" in robots
+    assert "Disallow: /api/" in robots
+    assert "https://fraeno.com/privacy.html" in sitemap
+    assert "https://fraeno.com/" in llms
+    assert "sets no" in privacy and "cookies" in privacy
+    assert "thabhelo@deepubuntu.com" in privacy
+    assert "max-width: 70rem" in styles

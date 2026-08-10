@@ -1,0 +1,16 @@
+# Fraeno
+
+Fraeno is a security gate between a software update and a robot. It manages
+robot software dependencies and validates every update against a live launch
+of the robot's ROS 2 system before the change can merge.
+
+- Product site: https://fraeno.com/
+- What it does: discovers dependencies across ROS 2, Python, CMake, Docker,
+  APT, vcstool, and git submodules; changes one dependency at a time; builds
+  baseline and candidate environments; compares nodes, topics, services,
+  actions, QoS, rates, transforms, and diagnostics; blocks the pull request
+  when behavior regresses.
+- Supported target: ROS 2 Humble on Ubuntu 22.04, amd64 and arm64, through a
+  GitHub App and Docker-based GitHub Actions runner.
+- Request access: use the contact form at https://fraeno.com/
+- Company: DeepUbuntu Labs (https://deepubuntu.com/)

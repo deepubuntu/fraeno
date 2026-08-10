@@ -791,7 +791,7 @@ h1 {
 }
 
 .action-window {
-  max-width: 62rem;
+  max-width: 70rem;
   margin: 0 auto;
   overflow: hidden;
   border: 1px solid rgba(21, 21, 21, 0.13);
@@ -1705,5 +1705,65 @@ button.install-link {
 }
 
 .contact-status.is-success {
+  color: var(--ink);
+}
+
+
+.contact-book {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+  color: var(--ink);
+  font-size: 0.9rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.contact-book:hover {
+  color: var(--orange);
+}
+
+.legal-page {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 8rem 1.5rem 5rem;
+  color: var(--ink);
+}
+
+.legal-page h1 {
+  font-size: 2.1rem;
+  line-height: 1.1;
+  margin: 0 0 0.5rem;
+}
+
+.legal-page .legal-updated {
+  color: var(--muted);
+  margin: 0 0 2.2rem;
+}
+
+.legal-page h2 {
+  font-size: 1.15rem;
+  margin: 2rem 0 0.5rem;
+}
+
+.legal-page p {
+  line-height: 1.6;
+  margin: 0 0 0.9rem;
+}
+
+.legal-page a {
+  color: var(--ink);
+}
+
+.legal-back {
+  display: inline-block;
+  margin-bottom: 2.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.legal-back:hover {
   color: var(--ink);
 }

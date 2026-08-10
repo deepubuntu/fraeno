@@ -341,9 +341,11 @@ if (contactForm) {
   contactForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const submit = contactForm.querySelector(".contact-submit");
+    const booking = contactOverlay.querySelector("[data-contact-book]");
     const fields = new FormData(contactForm);
     contactStatus.textContent = "";
     contactStatus.className = "contact-status";
+    booking.hidden = true;
     submit.disabled = true;
     try {
       const response = await fetch("/api/contact", {
@@ -364,6 +366,7 @@ if (contactForm) {
         contactStatus.textContent =
           "Request sent. We reply within one business day.";
         contactStatus.className = "contact-status is-success";
+        booking.hidden = false;
       } else {
         contactStatus.textContent =
           "That did not go through: " +

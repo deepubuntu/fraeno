@@ -1,0 +1,7 @@
+Content-Signal: search=yes, ai-input=yes, ai-train=no
+
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://fraeno.com/sitemap.xml
