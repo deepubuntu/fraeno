@@ -58,7 +58,7 @@ class FakeGitHubClient:
     async def pull_request(
         self, repository: str, pull_request_number: int, token: str
     ) -> PullRequestState:
-        assert repository == "deepubuntu/fraeno"
+        assert repository in {"deepubuntu/fraeno", "acme/warehouse-robot"}
         assert pull_request_number == 7
         assert token == "installation-token"
         return self.pull
@@ -66,7 +66,7 @@ class FakeGitHubClient:
     async def create_check_run(
         self, repository: str, head_sha: str, token: str, external_id: str
     ) -> CheckRun:
-        assert repository == "deepubuntu/fraeno"
+        assert repository in {"deepubuntu/fraeno", "acme/warehouse-robot"}
         assert head_sha == self.pull.head_sha
         assert token == "installation-token"
         assert external_id.startswith("fraeno:")
@@ -113,7 +113,7 @@ class FakeGitHubClient:
     async def cancel_workflow_run(
         self, repository: str, workflow_run_id: int, token: str
     ) -> None:
-        assert repository == "deepubuntu/fraeno"
+        assert repository in {"deepubuntu/fraeno", "acme/warehouse-robot"}
         assert token == "installation-token"
         self.cancellations.append(workflow_run_id)
 
@@ -388,3 +388,41 @@ async def test_draft_pull_request_is_ignored() -> None:
 
     assert client.dispatches == []
     assert client.updates == []
+
+
+@pytest.mark.anyio
+async def test_unapproved_installation_gets_a_private_beta_check() -> None:
+    client = FakeGitHubClient()
+    store = MemoryEventStore()
+    handler = EventHandler(client, store)  # type: ignore[arg-type]
+
+    payload = pull_request_payload()
+    payload["repository"]["full_name"] = "acme/warehouse-robot"
+
+    await handler.process("pull_request", "delivery-1", payload)
+
+    assert client.dispatches == []
+    final = client.updates[-1]
+    assert final["status"] == "completed"
+    assert final["conclusion"] == "neutral"
+    assert final["title"] == "Fraeno is in private beta"
+    assert "https://fraeno.com/" in final["summary"]
+    record = await store.get_repository(100)
+    assert record is not None and record.status == "not_approved"
+
+
+@pytest.mark.anyio
+async def test_wildcard_allowlist_admits_any_installation() -> None:
+    client = FakeGitHubClient()
+    client.settings = replace(
+        client.settings, approved_installation_logins=("*",)
+    )
+    store = MemoryEventStore()
+    handler = EventHandler(client, store)  # type: ignore[arg-type]
+
+    payload = pull_request_payload()
+    payload["repository"]["full_name"] = "acme/warehouse-robot"
+
+    await handler.process("pull_request", "delivery-1", payload)
+
+    assert len(client.dispatches) == 1

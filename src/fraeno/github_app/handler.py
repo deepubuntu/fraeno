@@ -306,6 +306,32 @@ class EventHandler:
             check = await self.client.create_check_run(
                 full_name, pull_request.head_sha, token, external_id
             )
+        approved = self.client.settings.approved_installation_logins
+        owner = full_name.split("/", 1)[0].lower()
+        if "*" not in approved and owner not in approved:
+            await self.store.upsert_repository(
+                self._repository_record(
+                    installation_id,
+                    repository,
+                    status="not_approved",
+                    reason="The installation account is not in the private beta",
+                )
+            )
+            await self.client.update_check_run(
+                full_name,
+                check.id,
+                token,
+                status="completed",
+                conclusion="neutral",
+                details_url=check.html_url,
+                title="Fraeno is in private beta",
+                summary=(
+                    "This account is not enabled for Fraeno validation yet. "
+                    "Request access at https://fraeno.com/ and the check will "
+                    "run automatically once the account is approved."
+                ),
+            )
+            return
         try:
             workflow = await self.client.find_workflow_run(
                 full_name, token, delivery_id

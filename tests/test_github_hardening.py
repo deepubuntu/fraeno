@@ -28,7 +28,9 @@ class RecordingMetrics:
 
 class MultiRepositoryGitHub:
     def __init__(self, settings: AppSettings | None = None) -> None:
-        self.settings = settings or AppSettings("1", "key")
+        self.settings = settings or AppSettings(
+            "1", "key", approved_installation_logins=("robotics",)
+        )
         self.workflow_readiness: dict[str, bool] = {}
         self.workflow_states: dict[int, WorkflowRun] = {}
         self.reports: dict[int, dict[str, Any] | None] = {}
