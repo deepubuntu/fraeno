@@ -32,7 +32,7 @@ jobs:
   publish:
     environment: runner-production
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       RELEASE_VERSION: ${{ inputs.version }}
       RELEASE_SHA: ${{ inputs.commit_sha }}
@@ -88,6 +88,12 @@ jobs:
           ruff check .
           mypy --strict src
 
+      - name: Set up QEMU for arm64 emulation
+        run: |
+          docker run --privileged --rm \
+            tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0 \
+            --install arm64
+
       - name: Build and test the exact runner
         run: |
           docker build \
@@ -99,6 +105,13 @@ jobs:
           bash tests/container/test-external-runner.sh \
             fraeno-runner:release-candidate \
             "$RELEASE_VERSION"
+          docker build \
+            --platform linux/arm64 \
+            --file runner/Dockerfile \
+            --build-arg "FRAENO_VERSION=$RELEASE_VERSION" \
+            --build-arg "FRAENO_REVISION=$RELEASE_SHA" \
+            --tag fraeno-runner:release-candidate-arm64 \
+            .
 
       - name: Require every release check
         env:
@@ -280,6 +293,7 @@ jobs:
         run: |
           docker buildx build \
             --file runner/Dockerfile \
+            --platform linux/amd64,linux/arm64 \
             --build-arg "FRAENO_VERSION=$RELEASE_VERSION" \
             --build-arg "FRAENO_REVISION=$RELEASE_SHA" \
             --tag "$RUNNER_IMAGE:v$RELEASE_VERSION" \
@@ -311,8 +325,13 @@ jobs:
           )"
           test "$semantic_digest" = "$RUNNER_DIGEST"
           test "$commit_digest" = "$RUNNER_DIGEST"
-          docker buildx imagetools inspect \
-            "$RUNNER_IMAGE@$RUNNER_DIGEST" >/dev/null
+          for platform in "linux/amd64" "linux/arm64"
+          do
+            docker buildx imagetools inspect \
+              "$RUNNER_IMAGE@$RUNNER_DIGEST" \
+              --format '{{range .Manifest.Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}}{{"\n"}}{{end}}' \
+              | grep -F -x -q "$platform"
+          done
           python -m fraeno.release_safety write-manifest \
             --version "$RELEASE_VERSION" \
             --commit-sha "$RELEASE_SHA" \
@@ -328,6 +347,8 @@ jobs:
             echo "## Immutable Fraeno runner"
             echo
             echo "\`$RUNNER_IMAGE@$RUNNER_DIGEST\`"
+            echo
+            echo "Platforms: linux/amd64 and linux/arm64."
             echo
             echo "No mutable alias was published."
           } >> "$GITHUB_STEP_SUMMARY"

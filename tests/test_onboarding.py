@@ -103,6 +103,39 @@ def test_init_writes_a_valid_contract_and_release_matched_templates(
     )
 
 
+def test_init_accepts_the_arm64_target(tmp_path: Path) -> None:
+    initialize_repository(
+        tmp_path,
+        project_name="jetson-robot",
+        build_command="colcon build",
+        setup_script="install/setup.bash",
+        launch_command="ros2 launch robot system.launch.py",
+        architecture="arm64",
+    )
+
+    raw = yaml.safe_load((tmp_path / ".fraeno.yml").read_text())
+    assert raw["target"] == {
+        "ros_distribution": "humble",
+        "operating_system": "ubuntu",
+        "operating_system_version": "22.04",
+        "architecture": "arm64",
+    }
+
+
+def test_init_refuses_an_unsupported_architecture(tmp_path: Path) -> None:
+    with pytest.raises(OnboardingError, match="amd64 or arm64, not riscv64"):
+        initialize_repository(
+            tmp_path,
+            project_name="robot",
+            build_command="colcon build",
+            setup_script="install/setup.bash",
+            launch_command="ros2 launch robot system.launch.py",
+            architecture="riscv64",
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_init_refuses_to_replace_any_trusted_file(tmp_path: Path) -> None:
     (tmp_path / ".fraeno.yml").write_text("owned by the repository\n")
 
@@ -261,6 +294,36 @@ def test_doctor_names_every_missing_required_file(tmp_path: Path) -> None:
         ".github/workflows/fraeno-updates.yml is missing.",
         ".github/fraeno/run-isolated-validation.sh is missing.",
     ]
+    assert not report.ready
+
+
+def test_doctor_accepts_a_declared_arm64_target(tmp_path: Path) -> None:
+    initialize(tmp_path)
+    config_path = tmp_path / ".fraeno.yml"
+    raw = yaml.safe_load(config_path.read_text())
+    raw["target"]["architecture"] = "arm64"
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False, width=100))
+
+    report = doctor_repository(tmp_path, local_only=True)
+
+    target = next(check for check in report.checks if check.name == "Target")
+    assert target.status is CheckStatus.PASS
+    assert "arm64" in target.message
+
+
+def test_doctor_refuses_an_unsupported_target_architecture(tmp_path: Path) -> None:
+    initialize(tmp_path)
+    config_path = tmp_path / ".fraeno.yml"
+    raw = yaml.safe_load(config_path.read_text())
+    raw["target"]["architecture"] = "riscv64"
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False, width=100))
+
+    report = doctor_repository(tmp_path, local_only=True)
+
+    target = next(check for check in report.checks if check.name == "Target")
+    assert target.status is CheckStatus.FAIL
+    assert "amd64 or arm64" in target.message
+    assert "riscv64" in target.message
     assert not report.ready
 
 

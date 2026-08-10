@@ -31,11 +31,19 @@ GENERATED_PATHS = (
     UPDATES_WORKFLOW_PATH,
     RUNNER_PATH,
 )
-SUPPORTED_TARGET = TargetPlatform(
-    ros_distribution="humble",
-    operating_system="ubuntu",
-    operating_system_version="22.04",
-    architecture="amd64",
+SUPPORTED_ROS_DISTRIBUTION = "humble"
+SUPPORTED_OPERATING_SYSTEM = "ubuntu"
+SUPPORTED_OPERATING_SYSTEM_VERSION = "22.04"
+SUPPORTED_ARCHITECTURES = ("amd64", "arm64")
+DEFAULT_ARCHITECTURE = "amd64"
+SUPPORTED_TARGETS = frozenset(
+    TargetPlatform(
+        ros_distribution=SUPPORTED_ROS_DISTRIBUTION,
+        operating_system=SUPPORTED_OPERATING_SYSTEM,
+        operating_system_version=SUPPORTED_OPERATING_SYSTEM_VERSION,
+        architecture=architecture,
+    )
+    for architecture in SUPPORTED_ARCHITECTURES
 )
 REQUIRED_APP_PERMISSIONS = {
     "actions": "write",
@@ -140,6 +148,7 @@ def initialize_repository(
     rate_topics: tuple[str, ...] = (),
     diagnostics_topics: tuple[str, ...] = (),
     transform_topics: tuple[str, ...] = (),
+    architecture: str = DEFAULT_ARCHITECTURE,
     open_pull_request: bool = False,
     branch: str = "fraeno/onboarding",
     runner_image: str | None = None,
@@ -153,6 +162,11 @@ def initialize_repository(
     launch = _parse_command(launch_command, "launch command")
     if not setup_script.strip():
         raise OnboardingError("setup script must not be empty")
+    if architecture not in SUPPORTED_ARCHITECTURES:
+        supported = " or ".join(SUPPORTED_ARCHITECTURES)
+        raise OnboardingError(
+            f"the target architecture must be {supported}, not {architecture}"
+        )
     if open_pull_request:
         _require_clean_git_repository(root)
         if runner_image is None:
@@ -185,6 +199,7 @@ def initialize_repository(
         rate_topics=rate_topics,
         diagnostics_topics=diagnostics_topics,
         transform_topics=transform_topics,
+        architecture=architecture,
     )
     created: list[Path] = []
     for relative in GENERATED_PATHS:
@@ -407,6 +422,7 @@ def _build_config(
     rate_topics: tuple[str, ...],
     diagnostics_topics: tuple[str, ...],
     transform_topics: tuple[str, ...],
+    architecture: str,
 ) -> dict[str, Any]:
     measured_topics = tuple(dict.fromkeys((*rate_topics, *required_topics)))
     contract: dict[str, Any] = {
@@ -422,10 +438,10 @@ def _build_config(
         "version": 1,
         "project": {"name": project_name},
         "target": {
-            "ros_distribution": SUPPORTED_TARGET.ros_distribution,
-            "operating_system": SUPPORTED_TARGET.operating_system,
-            "operating_system_version": SUPPORTED_TARGET.operating_system_version,
-            "architecture": SUPPORTED_TARGET.architecture,
+            "ros_distribution": SUPPORTED_ROS_DISTRIBUTION,
+            "operating_system": SUPPORTED_OPERATING_SYSTEM,
+            "operating_system_version": SUPPORTED_OPERATING_SYSTEM_VERSION,
+            "architecture": architecture,
         },
         "updates": {
             "update_types": [
@@ -706,7 +722,7 @@ def _check_target(root: Path, checks: list[DoctorCheck]) -> None:
                 "Target",
                 CheckStatus.FAIL,
                 "The target section is missing from .fraeno.yml.",
-                "Add ROS Humble, Ubuntu 22.04, and amd64 as the target.",
+                "Add ROS Humble, Ubuntu 22.04, and amd64 or arm64 as the target.",
             )
         )
         return
@@ -718,14 +734,14 @@ def _check_target(root: Path, checks: list[DoctorCheck]) -> None:
         ),
         architecture=str(target_raw.get("architecture", "unknown")),
     )
-    if configured != SUPPORTED_TARGET:
+    if configured not in SUPPORTED_TARGETS:
         checks.append(
             DoctorCheck(
                 "Target",
                 CheckStatus.FAIL,
                 (
-                    "Fraeno v1 supports ROS Humble on Ubuntu 22.04 amd64, but "
-                    f".fraeno.yml declares {_render_target(configured)}."
+                    "Fraeno v1 supports ROS Humble on Ubuntu 22.04 amd64 or arm64, "
+                    f"but .fraeno.yml declares {_render_target(configured)}."
                 ),
                 "Use a supported target or stop before installing Fraeno.",
             )
@@ -758,7 +774,10 @@ def _check_target(root: Path, checks: list[DoctorCheck]) -> None:
         DoctorCheck(
             "Target",
             CheckStatus.PASS,
-            "The repository declares the supported ROS Humble Ubuntu 22.04 amd64 target.",
+            (
+                "The repository declares the supported ROS Humble Ubuntu 22.04 "
+                f"{configured.architecture} target."
+            ),
         )
     )
 

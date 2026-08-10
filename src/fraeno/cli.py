@@ -19,6 +19,8 @@ from fraeno.lockfile import (
 )
 from fraeno.models import ScanReport
 from fraeno.onboarding import (
+    DEFAULT_ARCHITECTURE,
+    SUPPORTED_ARCHITECTURES,
     CheckStatus,
     doctor_repository,
     initialize_repository,
@@ -184,6 +186,12 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--rate-topic", action="append", default=[])
     init.add_argument("--diagnostics-topic", action="append", default=[])
     init.add_argument("--transform-topic", action="append", default=[])
+    init.add_argument(
+        "--architecture",
+        default=DEFAULT_ARCHITECTURE,
+        choices=SUPPORTED_ARCHITECTURES,
+        help="Target CPU architecture for validation runs.",
+    )
     init.add_argument(
         "--open-pr",
         action="store_true",
@@ -480,6 +488,7 @@ def _init(args: argparse.Namespace) -> int:
         rate_topics=tuple(args.rate_topic),
         diagnostics_topics=tuple(args.diagnostics_topic),
         transform_topics=tuple(args.transform_topic),
+        architecture=args.architecture,
         open_pull_request=args.open_pr,
         branch=args.branch,
         runner_image=args.runner_image,

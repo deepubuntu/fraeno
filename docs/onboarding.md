@@ -6,7 +6,11 @@ anything that already exists.
 
 ## Before you start
 
-The first supported target is ROS 2 Humble on Ubuntu 22.04 and `amd64`.
+The supported targets are ROS 2 Humble on Ubuntu 22.04 with the `amd64` or
+`arm64` architecture. The `arm64` target covers boards such as NVIDIA Jetson
+and Raspberry Pi. `fraeno init` writes `amd64` by default; set
+`target.architecture` to `arm64` in `.fraeno.yml` for an arm64 robot. Any
+other architecture is refused.
 
 You need:
 

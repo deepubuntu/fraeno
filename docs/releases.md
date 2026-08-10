@@ -101,6 +101,15 @@ It does not publish a moving alias. Customer workflows use only:
 REGISTRY/runner@sha256:FULL_DIGEST
 ```
 
+Each release is one multi-architecture manifest list containing `linux/amd64`
+and `linux/arm64` images, so the same immutable digest serves amd64 hosts and
+arm64 robots such as NVIDIA Jetson and Raspberry Pi. The pinned digest is the
+manifest-list digest. Before publishing, the workflow runs the full external
+validation against the natively built `amd64` image and builds the `arm64`
+image under QEMU emulation, which executes the packaged CLI version self-check
+inside the arm64 image. After pushing, it verifies that both platforms are
+present in the published manifest list.
+
 BuildKit attaches an SPDX SBOM and SLSA provenance to the image. The workflow
 captures the registry digest, confirms both tags resolve to it, and uploads a
 checksummed release manifest for 90 days. The manifest records the four release
