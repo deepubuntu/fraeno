@@ -23,20 +23,24 @@ function reject(status, reason) {
 const EMAIL_FONT =
   "'Inter Tight', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
-function emailShell(heading, bodyHtml) {
+function emailShell(heading, bodyHtml, footerLine) {
   return (
-    '<div style="margin:0;padding:32px 16px;background-color:#f3f2ef;">' +
+    '<div style="margin:0;padding:36px 16px;background-color:#f3f2ef;">' +
+    "<style>@font-face{font-family:'Inter Tight';" +
+    "src:url('https://fraeno.com/assets/inter-tight-latin.woff2') format('woff2');" +
+    "font-weight:400 700;font-display:swap;}</style>" +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">' +
-    '<tr><td style="padding:0 4px 14px;">' +
-    `<span style="font-family:${EMAIL_FONT};font-size:19px;font-weight:600;color:#151515;">fraeno</span>` +
+    '<tr><td style="padding:0 6px 16px;">' +
+    `<span style="font-family:${EMAIL_FONT};font-size:22px;font-weight:600;letter-spacing:-0.01em;color:#151515;">fraeno</span>` +
     "</td></tr>" +
-    '<tr><td style="background-color:#ffffff;border:1px solid rgba(21,21,21,0.13);border-top:3px solid #ff6333;border-radius:14px;padding:28px 28px 24px;">' +
-    `<h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:20px;line-height:1.25;color:#151515;">${heading}</h1>` +
+    '<tr><td style="background-color:#ffffff;border:1px solid rgba(21,21,21,0.13);border-radius:16px;padding:36px 32px 32px;">' +
+    `<h1 style="margin:0 0 6px;font-family:${EMAIL_FONT};font-size:24px;font-weight:600;line-height:1.25;letter-spacing:-0.015em;color:#151515;">${heading}</h1>` +
     bodyHtml +
     "</td></tr>" +
-    '<tr><td style="padding:16px 4px 0;">' +
-    `<p style="margin:0;font-family:${EMAIL_FONT};font-size:12px;line-height:1.5;color:#92918d;">` +
-    "© 2026 DeepUbuntu Labs · " +
+    '<tr><td style="padding:24px 6px 0;text-align:center;">' +
+    `<p style="margin:0 0 8px;font-family:${EMAIL_FONT};font-size:13px;line-height:1.6;color:#92918d;">${footerLine}</p>` +
+    `<p style="margin:0;font-family:${EMAIL_FONT};font-size:13px;line-height:1.6;color:#92918d;">` +
+    "DeepUbuntu Labs &nbsp;&middot;&nbsp; Talladega, Alabama &nbsp;&middot;&nbsp; " +
     '<a href="https://fraeno.com/" style="color:#92918d;">fraeno.com</a>' +
     "</p></td></tr>" +
     "</table></div>"
@@ -45,16 +49,25 @@ function emailShell(heading, bodyHtml) {
 
 function emailRow(label, value) {
   return (
-    `<p style="margin:0 0 6px;font-family:${EMAIL_FONT};font-size:14px;line-height:1.6;color:#151515;">` +
+    `<p style="margin:0 0 8px;font-family:${EMAIL_FONT};font-size:15px;line-height:1.6;color:#151515;">` +
     `<span style="color:#666663;">${label}</span>&nbsp;&nbsp;${value}</p>`
   );
 }
 
 function emailParagraph(text) {
   return (
-    `<p style="margin:14px 0 0;font-family:${EMAIL_FONT};font-size:14px;line-height:1.7;color:#151515;">` +
+    `<p style="margin:16px 0 0;font-family:${EMAIL_FONT};font-size:16px;line-height:1.7;color:#151515;">` +
     text +
     "</p>"
+  );
+}
+
+function emailButton(label, href) {
+  return (
+    '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 2px;"><tr>' +
+    '<td style="background-color:#080808;border-radius:999px;">' +
+    `<a href="${href}" style="display:inline-block;padding:13px 28px;font-family:${EMAIL_FONT};font-size:15px;font-weight:500;color:#ffffff;text-decoration:none;">${label}</a>` +
+    "</td></tr></table>"
   );
 }
 
@@ -169,7 +182,11 @@ export default {
         replyTo: { email, name },
         subject,
         text: lines.join("\n"),
-        html: emailShell("New access request", notificationBody),
+        html: emailShell(
+          "New access request",
+          '<div style="margin-top:14px;">' + notificationBody + "</div>",
+          "Sent by the fraeno.com contact form."
+        ),
       });
     } catch (error) {
       console.log(`contact send failed: ${error}`);
@@ -177,27 +194,47 @@ export default {
     }
 
     try {
+      const firstName = escapeHtml(name.split(/\s+/)[0]);
       const confirmationBody =
+        emailParagraph(`Hi ${firstName},`) +
         emailParagraph(
-          "Thanks for your interest in Fraeno. Your request is in and a " +
-            "reply is on its way within one business day."
+          "Thanks for reaching out. Your request has landed safely, and a " +
+            "real person reads every single one."
         ) +
         emailParagraph(
-          "Want to talk sooner? " +
-            '<a href="https://calendar.app.google/fB6AtdB5FVSs8YoA9" ' +
-            'style="color:#ff6333;">Book a call</a>.'
-        );
+          "Fraeno is built by a small team on a simple belief: no software " +
+            "update should ever make a robot dangerous. Conversations like " +
+            "yours shape what we build next, so we are genuinely glad you " +
+            "wrote in."
+        ) +
+        emailParagraph(
+          "You will hear from us shortly. If you would like to talk sooner, " +
+            "pick a time that suits you and we will meet you there."
+        ) +
+        emailButton(
+          "Book a call",
+          "https://calendar.app.google/fB6AtdB5FVSs8YoA9"
+        ) +
+        emailParagraph("Talk soon,<br>Thabhelo, DeepUbuntu Labs");
       await env.EMAIL.send({
         to: email,
         from: { email: FROM_ADDRESS, name: "Fraeno" },
         replyTo: { email: NOTIFY_ADDRESS, name: "Thabhelo Duve" },
         subject: "We received your Fraeno access request",
         text:
-          "Thanks for your interest in Fraeno. Your request is in and a " +
-          "reply is on its way within one business day.\n\n" +
-          "Want to talk sooner? Book a call: " +
-          "https://calendar.app.google/fB6AtdB5FVSs8YoA9\n",
-        html: emailShell("Request received", confirmationBody),
+          `Hi ${name.split(/\s+/)[0]},\n\n` +
+          "Thanks for reaching out. Your request has landed safely, and a " +
+          "real person reads every single one.\n\n" +
+          "Fraeno is built by a small team on a simple belief: no software " +
+          "update should ever make a robot dangerous. Conversations like " +
+          "yours shape what we build next, so we are genuinely glad you " +
+          "wrote in.\n\n" +
+          "You will hear from us shortly. If you would like to talk sooner, " +
+          "book a call: https://calendar.app.google/fB6AtdB5FVSs8YoA9\n\n" +
+          "Talk soon,\nThabhelo, DeepUbuntu Labs\n",
+        html: emailShell("We got your request", confirmationBody, 
+          "You are receiving this one-time message because you requested access at fraeno.com."
+        ),
       });
     } catch (error) {
       console.log(`confirmation send failed: ${error}`);
