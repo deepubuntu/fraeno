@@ -13,9 +13,11 @@ from fraeno.scanner import RepositoryScanner
 from fraeno.update_discovery import (
     AptUpdateProvider,
     CatalogRecord,
+    DockerUpdateProvider,
     FixtureUpdateCatalog,
     PythonUpdateProvider,
     RegistryUpdateCatalog,
+    RosdepUpdateProvider,
     discover_updates,
 )
 from fraeno.updates import apply_next_update
@@ -268,6 +270,17 @@ def test_registry_catalog_parses_provider_api_responses_without_network() -> Non
             )
         if host == "api.github.com" and "/compare/" in path:
             return httpx.Response(200, json={"status": "ahead"})
+        if host == "raw.githubusercontent.com" and path.endswith("/humble/distribution.yaml"):
+            return httpx.Response(
+                200,
+                text=(
+                    "repositories:\n"
+                    "  rclcpp:\n"
+                    "    release:\n"
+                    "      version: 16.0.15-1\n"
+                    "      packages: [rclcpp]\n"
+                ),
+            )
         raise AssertionError(f"unexpected request: {request.url}")
 
     with httpx.Client(transport=httpx.MockTransport(response)) as client:
@@ -279,6 +292,169 @@ def test_registry_catalog_parses_provider_api_responses_without_network() -> Non
         "docker:ros",
         "git:navigation",
         "python:requests",
+        "ros:rclcpp",
     ]
-    assert discovery.refusals[0].identity == "ros:rclcpp"
-    assert "currently resolved package" in discovery.refusals[0].reason
+    assert discovery.refusals == ()
+    rosdep = discovery.candidates[-1]
+    assert rosdep.target == "16.0.15-1"
+    assert rosdep.metadata["apt_package"] == "ros-humble-rclcpp"
+
+
+def test_registry_catalog_resolves_ghcr_tags_to_architecture_digests() -> None:
+    report = ScanReport(
+        root="/fixture",
+        dependencies=[
+            Dependency(
+                ecosystem=Ecosystem.DOCKER,
+                name="ghcr.io/acme/robot-runner",
+                resolved="1.4.0",
+                constraint="==1.4.0",
+                source=SourceLocation("Dockerfile", 1),
+            )
+        ],
+        files_scanned=["Dockerfile"],
+    )
+    amd64_digest = "sha256:" + ("4" * 64)
+
+    def response(request: httpx.Request) -> httpx.Response:
+        host = request.url.host
+        path = request.url.path
+        if host == "ghcr.io" and path == "/token":
+            return httpx.Response(200, json={"token": "anonymous"})
+        if host == "ghcr.io" and path == "/v2/acme/robot-runner/manifests/1.4.0":
+            assert request.headers["Authorization"] == "Bearer anonymous"
+            return httpx.Response(
+                200,
+                json={
+                    "mediaType": "application/vnd.oci.image.index.v1+json",
+                    "annotations": {
+                        "org.opencontainers.image.created": "2026-07-30T12:00:00Z"
+                    },
+                    "manifests": [
+                        {
+                            "digest": amd64_digest,
+                            "platform": {"os": "linux", "architecture": "amd64"},
+                        },
+                        {
+                            "digest": "sha256:" + ("5" * 64),
+                            "platform": {"os": "linux", "architecture": "arm64"},
+                        },
+                    ],
+                },
+            )
+        raise AssertionError(f"unexpected request: {request.url}")
+
+    with httpx.Client(transport=httpx.MockTransport(response)) as client:
+        catalog = RegistryUpdateCatalog(client)
+        discovery = discover_updates(
+            report,
+            target=TARGET,
+            catalog=catalog,
+            providers=(DockerUpdateProvider(),),
+        )
+
+    assert [candidate.target for candidate in discovery.candidates] == [amd64_digest]
+    candidate = discovery.candidates[0]
+    assert candidate.release_date == "2026-07-30T12:00:00Z"
+    assert candidate.metadata["registry"] == "ghcr"
+    assert candidate.metadata["architecture"] == "amd64"
+
+
+def test_registry_catalog_warns_when_ghcr_image_misses_target_architecture() -> None:
+    report = ScanReport(
+        root="/fixture",
+        dependencies=[
+            Dependency(
+                ecosystem=Ecosystem.DOCKER,
+                name="ghcr.io/acme/robot-runner",
+                resolved="1.4.0",
+                constraint="==1.4.0",
+                source=SourceLocation("Dockerfile", 1),
+            )
+        ],
+        files_scanned=["Dockerfile"],
+    )
+
+    def response(request: httpx.Request) -> httpx.Response:
+        host = request.url.host
+        path = request.url.path
+        if host == "ghcr.io" and path == "/token":
+            return httpx.Response(200, json={"token": "anonymous"})
+        if host == "ghcr.io" and path == "/v2/acme/robot-runner/manifests/1.4.0":
+            return httpx.Response(
+                200,
+                json={
+                    "mediaType": "application/vnd.oci.image.index.v1+json",
+                    "manifests": [
+                        {
+                            "digest": "sha256:" + ("6" * 64),
+                            "platform": {"os": "linux", "architecture": "arm64"},
+                        }
+                    ],
+                },
+            )
+        raise AssertionError(f"unexpected request: {request.url}")
+
+    with httpx.Client(transport=httpx.MockTransport(response)) as client:
+        catalog = RegistryUpdateCatalog(client)
+        discovery = discover_updates(
+            report,
+            target=TARGET,
+            catalog=catalog,
+            providers=(DockerUpdateProvider(),),
+        )
+
+    assert discovery.candidates == ()
+    assert any("target architecture" in warning for warning in discovery.warnings)
+
+
+def test_registry_catalog_resolves_rosdep_system_keys_through_launchpad() -> None:
+    report = ScanReport(
+        root="/fixture",
+        dependencies=[
+            Dependency(
+                ecosystem=Ecosystem.ROS,
+                name="libboost-dev",
+                source=SourceLocation("package.xml", 12),
+            )
+        ],
+        files_scanned=["package.xml"],
+    )
+
+    def response(request: httpx.Request) -> httpx.Response:
+        host = request.url.host
+        path = request.url.path
+        if host == "raw.githubusercontent.com" and path.endswith("/humble/distribution.yaml"):
+            return httpx.Response(200, text="repositories: {}\n")
+        if host == "raw.githubusercontent.com" and path.endswith("/rosdep/base.yaml"):
+            return httpx.Response(200, text="libboost-dev:\n  ubuntu: [libboost-dev]\n")
+        if host == "api.launchpad.net":
+            assert request.url.params["binary_name"] == "libboost-dev"
+            assert request.url.params["distro_arch_series"] == "/ubuntu/jammy/amd64"
+            return httpx.Response(
+                200,
+                json={
+                    "entries": [
+                        {
+                            "binary_package_version": "1.74.0.3ubuntu7",
+                            "date_published": "2026-05-02T09:00:00Z",
+                            "self_link": "https://api.launchpad.net/libboost-dev",
+                        }
+                    ]
+                },
+            )
+        raise AssertionError(f"unexpected request: {request.url}")
+
+    with httpx.Client(transport=httpx.MockTransport(response)) as client:
+        catalog = RegistryUpdateCatalog(client)
+        discovery = discover_updates(
+            report,
+            target=TARGET,
+            catalog=catalog,
+            providers=(RosdepUpdateProvider(),),
+        )
+
+    assert [candidate.target for candidate in discovery.candidates] == ["1.74.0.3ubuntu7"]
+    candidate = discovery.candidates[0]
+    assert candidate.metadata["rosdep_key"] == "libboost-dev"
+    assert candidate.metadata["apt_package"] == "libboost-dev"

@@ -77,10 +77,14 @@ immutable. Every candidate keeps its release date, registry source, and
 provenance.
 
 The production catalog reads public package and source registries for Python,
-Docker, APT, and vcstool. A rosdep declaration does not contain the installed
-system-package version, so the provider requires a catalog or resolver to
-supply both the current and target package evidence. It returns a typed refusal
-when that target-specific evidence is absent.
+Docker, APT, vcstool, and rosdep. Docker images resolve through public Docker
+Hub or GHCR, and every digest is selected for the exact target architecture.
+A rosdep key resolves through the public rosdistro index: keys released into
+the target ROS distribution report the newest distribution release, and system
+keys resolve through the rosdep database to one Ubuntu package before
+Launchpad supplies its newest published binary. Ambiguous keys, unknown keys,
+and multi-package resolutions remain typed refusals or warnings, and ROS
+declarations are still observed rather than rewritten.
 
 Tests use a committed catalog fixture, so the suite has no registry or internet
 dependency. The fixture represents ROS 2 Humble on Ubuntu 22.04 and exercises

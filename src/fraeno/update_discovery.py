@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from urllib.parse import quote
 
 import httpx
+import yaml
 from packaging.version import InvalidVersion, Version
 
 from fraeno.dependency_graph import Provenance, TargetPlatform, infer_target_platform
@@ -468,6 +469,8 @@ class RegistryUpdateCatalog:
             follow_redirects=True,
             headers={"Accept": "application/json"},
         )
+        self._rosdistro_cache: dict[str, dict[str, tuple[str, str]]] = {}
+        self._rosdep_cache: dict[str, dict[str, Any]] = {}
 
     def close(self) -> None:
         if self._owns_client:
@@ -511,6 +514,9 @@ class RegistryUpdateCatalog:
         current = query.dependency.resolved or ""
         if not current or current.startswith("sha256:"):
             return ()
+        registry, remainder = _split_image_reference(query.dependency.name)
+        if registry == "ghcr.io":
+            return self._ghcr(query, remainder, current)
         namespace, repository = _docker_hub_name(query.dependency.name)
         response = self.client.get(
             "https://hub.docker.com/v2/namespaces/"
@@ -629,9 +635,215 @@ class RegistryUpdateCatalog:
             ),
         )
 
+    def _ghcr(
+        self,
+        query: CatalogQuery,
+        repository: str,
+        tag: str,
+    ) -> Sequence[CatalogRecord]:
+        token_response = self.client.get(
+            "https://ghcr.io/token",
+            params={"scope": f"repository:{repository}:pull"},
+        )
+        token_response.raise_for_status()
+        token = str(token_response.json().get("token") or "")
+        if not token:
+            raise CatalogError("GHCR did not issue an anonymous pull token")
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": ", ".join(_OCI_MANIFEST_TYPES),
+        }
+        manifest_response = self.client.get(
+            f"https://ghcr.io/v2/{repository}/manifests/{quote(tag)}",
+            headers=headers,
+        )
+        manifest_response.raise_for_status()
+        manifest = manifest_response.json()
+        architecture = query.target.architecture
+        if str(manifest.get("mediaType") or "") in _OCI_INDEX_TYPES:
+            digest = _oci_platform_digest(manifest, architecture)
+            if digest is None:
+                raise CatalogError("GHCR did not return one digest for the target architecture")
+        else:
+            digest = str(manifest_response.headers.get("docker-content-digest") or "")
+            if re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest) is None:
+                raise CatalogError("GHCR did not return a content digest for the image tag")
+            built_for = self._ghcr_config_architecture(repository, manifest, headers)
+            if architecture != "unknown" and built_for != architecture:
+                raise CatalogError(
+                    f"the GHCR image is built for {built_for}, not {architecture}"
+                )
+        created = _oci_created_annotation(manifest)
+        return (
+            CatalogRecord(
+                current=tag,
+                target=digest,
+                source=str(manifest_response.url),
+                release_date=created,
+                evidence=(
+                    "GHCR resolved the mutable image tag to the published "
+                    "target-architecture digest."
+                ),
+                metadata={
+                    "registry": "ghcr",
+                    "tag": tag,
+                    "architecture": architecture,
+                },
+            ),
+        )
+
+    def _ghcr_config_architecture(
+        self,
+        repository: str,
+        manifest: dict[str, Any],
+        headers: dict[str, str],
+    ) -> str:
+        config = manifest.get("config")
+        if not isinstance(config, dict) or not config.get("digest"):
+            raise CatalogError("the GHCR image manifest does not name a config blob")
+        response = self.client.get(
+            f"https://ghcr.io/v2/{repository}/blobs/{quote(str(config['digest']))}",
+            headers=headers,
+        )
+        response.raise_for_status()
+        return str(response.json().get("architecture") or "unknown")
+
     def _rosdep(self, query: CatalogQuery) -> Sequence[CatalogRecord]:
-        del query
-        return ()
+        series = _ubuntu_series(query.target.operating_system_version)
+        if query.target.operating_system != "ubuntu" or series is None:
+            return ()
+        distribution = query.target.ros_distribution
+        key = query.dependency.name
+        current = query.dependency.resolved or ""
+        released = self._rosdistro_release_versions(distribution).get(key)
+        if released is not None:
+            version, repository = released
+            return (
+                CatalogRecord(
+                    current=current or "unreleased",
+                    target=version,
+                    source=f"{_ROSDISTRO_ROOT}/{distribution}/distribution.yaml",
+                    release_date="unknown",
+                    evidence=(
+                        "The rosdistro index lists the newest version released "
+                        "into the target ROS distribution."
+                    ),
+                    metadata={
+                        "distribution": distribution,
+                        "repository": repository,
+                        "apt_package": f"ros-{distribution}-{key.replace('_', '-')}",
+                    },
+                ),
+            )
+        packages = self._rosdep_system_packages(key, series)
+        if packages is None:
+            raise CatalogError("the rosdep key is not in the rosdistro database")
+        if len(packages) != 1:
+            raise CatalogError(
+                f"the rosdep key resolves to {len(packages)} APT packages, "
+                "so one update target is ambiguous"
+            )
+        return self._rosdep_apt_record(query, key, packages[0], series)
+
+    def _rosdep_apt_record(
+        self,
+        query: CatalogQuery,
+        key: str,
+        package: str,
+        series: str,
+    ) -> Sequence[CatalogRecord]:
+        architecture = query.target.architecture
+        response = self.client.get(
+            "https://api.launchpad.net/devel/ubuntu/+archive/primary",
+            params={
+                "ws.op": "getPublishedBinaries",
+                "binary_name": package,
+                "distro_arch_series": f"/ubuntu/{series}/{architecture}",
+                "exact_match": "true",
+                "status": "Published",
+                "order_by_date": "true",
+                "ws.size": "1",
+            },
+        )
+        response.raise_for_status()
+        entries = response.json().get("entries", [])
+        if not entries:
+            return ()
+        entry = entries[0]
+        return (
+            CatalogRecord(
+                current=query.dependency.resolved or "unresolved",
+                target=str(entry["binary_package_version"]),
+                source=str(entry.get("self_link") or response.url),
+                release_date=str(entry.get("date_published") or "unknown"),
+                evidence=(
+                    "The rosdistro database mapped the rosdep key to one Ubuntu "
+                    "package and Launchpad returned its newest published binary."
+                ),
+                metadata={
+                    "rosdep_key": key,
+                    "apt_package": package,
+                    "series": series,
+                    "architecture": architecture,
+                },
+            ),
+        )
+
+    def _rosdistro_release_versions(
+        self,
+        distribution: str,
+    ) -> dict[str, tuple[str, str]]:
+        cached = self._rosdistro_cache.get(distribution)
+        if cached is not None:
+            return cached
+        document = self._fetch_yaml(f"{_ROSDISTRO_ROOT}/{distribution}/distribution.yaml")
+        versions: dict[str, tuple[str, str]] = {}
+        repositories = document.get("repositories")
+        if isinstance(repositories, dict):
+            for repository_name, repository in repositories.items():
+                if not isinstance(repository, dict):
+                    continue
+                release = repository.get("release")
+                if not isinstance(release, dict) or not release.get("version"):
+                    continue
+                version = str(release["version"])
+                packages = release.get("packages")
+                names = (
+                    [str(name) for name in packages]
+                    if isinstance(packages, list)
+                    else [str(repository_name)]
+                )
+                for name in names:
+                    versions[name] = (version, str(repository_name))
+        self._rosdistro_cache[distribution] = versions
+        return versions
+
+    def _rosdep_system_packages(self, key: str, series: str) -> list[str] | None:
+        for path in ("rosdep/base.yaml", "rosdep/python.yaml"):
+            document = self._rosdep_document(path)
+            entry = document.get(key)
+            if entry is None:
+                continue
+            packages = _rosdep_ubuntu_packages(entry, series)
+            if packages is not None:
+                return packages
+        return None
+
+    def _rosdep_document(self, path: str) -> dict[str, Any]:
+        cached = self._rosdep_cache.get(path)
+        if cached is not None:
+            return cached
+        document = self._fetch_yaml(f"{_ROSDISTRO_ROOT}/{path}")
+        self._rosdep_cache[path] = document
+        return document
+
+    def _fetch_yaml(self, url: str) -> dict[str, Any]:
+        response = self.client.get(url)
+        response.raise_for_status()
+        document = yaml.safe_load(response.text)
+        if not isinstance(document, dict):
+            raise CatalogError(f"the rosdistro document is not a mapping: {url}")
+        return document
 
 
 def _record_from_mapping(raw: dict[str, Any]) -> CatalogRecord:
@@ -673,15 +885,101 @@ def _source_files(dependencies: Sequence[Dependency]) -> tuple[str, ...]:
     return tuple(sorted({item.source.path for item in dependencies}))
 
 
-def _docker_hub_name(image: str) -> tuple[str, str]:
+_ROSDISTRO_ROOT = "https://raw.githubusercontent.com/ros/rosdistro/master"
+
+_OCI_INDEX_TYPES = frozenset(
+    {
+        "application/vnd.oci.image.index.v1+json",
+        "application/vnd.docker.distribution.manifest.list.v2+json",
+    }
+)
+
+_OCI_MANIFEST_TYPES = (
+    "application/vnd.oci.image.index.v1+json",
+    "application/vnd.docker.distribution.manifest.list.v2+json",
+    "application/vnd.oci.image.manifest.v1+json",
+    "application/vnd.docker.distribution.manifest.v2+json",
+)
+
+
+def _split_image_reference(image: str) -> tuple[str | None, str]:
     parts = image.split("/")
     if "." in parts[0] or ":" in parts[0] or parts[0] == "localhost":
-        if parts[0] not in {"docker.io", "index.docker.io"}:
-            raise CatalogError("only public Docker Hub images are supported automatically")
-        parts = parts[1:]
+        return parts[0], "/".join(parts[1:])
+    return None, image
+
+
+def _docker_hub_name(image: str) -> tuple[str, str]:
+    registry, remainder = _split_image_reference(image)
+    if registry is not None and registry not in {"docker.io", "index.docker.io"}:
+        raise CatalogError(
+            "only public Docker Hub and GHCR images are supported automatically"
+        )
+    parts = remainder.split("/")
     if len(parts) == 1:
         return "library", parts[0]
     return parts[0], "/".join(parts[1:])
+
+
+def _oci_platform_digest(manifest: dict[str, Any], architecture: str) -> str | None:
+    manifests = manifest.get("manifests", [])
+    if not isinstance(manifests, list):
+        return None
+    matches = [
+        str(entry["digest"])
+        for entry in manifests
+        if isinstance(entry, dict)
+        and entry.get("digest")
+        and isinstance(entry.get("platform"), dict)
+        and entry["platform"].get("os") == "linux"
+        and (
+            architecture == "unknown"
+            or entry["platform"].get("architecture") == architecture
+        )
+    ]
+    unique = sorted(set(matches))
+    return unique[0] if len(unique) == 1 else None
+
+
+def _oci_created_annotation(manifest: dict[str, Any]) -> str:
+    annotations = manifest.get("annotations")
+    if isinstance(annotations, dict):
+        created = annotations.get("org.opencontainers.image.created")
+        if created:
+            return str(created)
+    return "unknown"
+
+
+def _rosdep_ubuntu_packages(entry: Any, series: str) -> list[str] | None:
+    if not isinstance(entry, dict):
+        return None
+    ubuntu = entry.get("ubuntu")
+    if ubuntu is None:
+        return None
+    if isinstance(ubuntu, list):
+        return [str(package) for package in ubuntu]
+    if isinstance(ubuntu, dict):
+        if series in ubuntu:
+            return _rosdep_manager_packages(ubuntu[series])
+        if "*" in ubuntu:
+            return _rosdep_manager_packages(ubuntu["*"])
+        if "apt" in ubuntu or "pip" in ubuntu:
+            return _rosdep_manager_packages(ubuntu)
+    return None
+
+
+def _rosdep_manager_packages(entry: Any) -> list[str] | None:
+    if entry is None:
+        return None
+    if isinstance(entry, list):
+        return [str(package) for package in entry]
+    if isinstance(entry, dict):
+        manager = entry.get("apt", entry.get("pip"))
+        if isinstance(manager, list):
+            return [str(package) for package in manager]
+        if isinstance(manager, dict) and isinstance(manager.get("packages"), list):
+            return [str(package) for package in manager["packages"]]
+    return None
 
 
 def _docker_digest(data: dict[str, Any], architecture: str) -> str | None:
