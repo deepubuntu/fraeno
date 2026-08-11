@@ -1806,3 +1806,11 @@ button.install-link {
 .legal-wordmark:hover {
   color: var(--orange);
 }
+
+
+.footer-mark {
+  width: 14px;
+  height: 14px;
+  margin-right: 0.35rem;
+  vertical-align: -2px;
+}
