@@ -449,7 +449,7 @@ def test_site_contact_form_keeps_message_optional_with_update_consent() -> None:
 
     assert "minlength" not in page
     assert 'name="updates"' in page
-    assert '(optional)' in page
+    assert "(optional)" not in page
     assert 'fields.get("updates") === "on"' in script
     assert "env.CONTACTS.put" in worker
     assert "message: { min: 0, max: 4000 }" in worker
