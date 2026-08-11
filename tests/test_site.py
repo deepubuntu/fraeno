@@ -453,3 +453,7 @@ def test_site_contact_form_keeps_message_optional_with_update_consent() -> None:
     assert 'fields.get("updates") === "on"' in script
     assert "env.CONTACTS.put" in worker
     assert "message: { min: 0, max: 4000 }" in worker
+    assert "/api/unsubscribe" in worker
+    assert "List-Unsubscribe-Post" in worker
+    assert "unsubscribe_token" in worker
+    assert "&copy; 2026 DeepUbuntu Labs" in worker

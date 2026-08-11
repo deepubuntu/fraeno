@@ -40,7 +40,7 @@ function emailShell(heading, bodyHtml, footerLine) {
     '<tr><td style="padding:24px 6px 0;text-align:center;">' +
     `<p style="margin:0 0 8px;font-family:${EMAIL_FONT};font-size:13px;line-height:1.6;color:#92918d;">${footerLine}</p>` +
     `<p style="margin:0;font-family:${EMAIL_FONT};font-size:13px;line-height:1.6;color:#92918d;">` +
-    "DeepUbuntu Labs &nbsp;&middot;&nbsp; San Francisco, CA &nbsp;&middot;&nbsp; " +
+    "&copy; 2026 DeepUbuntu Labs &nbsp;&middot;&nbsp; San Francisco, CA &nbsp;&middot;&nbsp; " +
     '<a href="https://fraeno.com/" style="color:#92918d;">fraeno.com</a>' +
     "</p></td></tr>" +
     "</table></div>"
@@ -99,8 +99,76 @@ function validate(payload) {
   return null;
 }
 
+function unsubscribePage(heading, body) {
+  return new Response(
+    '<!doctype html><html lang="en"><head><meta charset="utf-8" />' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1" />' +
+      "<title>Fraeno | Unsubscribe</title></head>" +
+      '<body style="margin:0;padding:64px 16px;background-color:#f3f2ef;">' +
+      '<div style="max-width:560px;margin:0 auto;">' +
+      `<p style="font-family:${EMAIL_FONT};font-size:22px;font-weight:600;color:#151515;margin:0 0 24px;">fraeno</p>` +
+      '<div style="background-color:#ffffff;border:1px solid rgba(21,21,21,0.13);border-radius:16px;padding:36px 32px;">' +
+      `<h1 style="font-family:${EMAIL_FONT};font-size:24px;font-weight:600;color:#151515;margin:0 0 12px;">${heading}</h1>` +
+      `<p style="font-family:${EMAIL_FONT};font-size:16px;line-height:1.7;color:#151515;margin:0;">${body}</p>` +
+      "</div>" +
+      `<p style="font-family:${EMAIL_FONT};font-size:13px;color:#92918d;margin:20px 0 0;text-align:center;">` +
+      'DeepUbuntu Labs &nbsp;&middot;&nbsp; <a href="https://fraeno.com/" style="color:#92918d;">fraeno.com</a></p>' +
+      "</div></body></html>",
+    {
+      status: heading === "You are unsubscribed" ? 200 : 404,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    }
+  );
+}
+
+async function handleUnsubscribe(request, env) {
+  const url = new URL(request.url);
+  const email = (url.searchParams.get("e") || "").trim().toLowerCase();
+  const token = (url.searchParams.get("t") || "").trim();
+  const record = email ? await env.CONTACTS.get(email, "json") : null;
+  const valid =
+    record !== null &&
+    typeof record.unsubscribe_token === "string" &&
+    record.unsubscribe_token.length > 0 &&
+    record.unsubscribe_token === token;
+  if (!valid) {
+    if (request.method === "POST") {
+      return new Response(null, { status: 404 });
+    }
+    return unsubscribePage(
+      "This link is not valid",
+      "The unsubscribe link is incomplete or expired. Email " +
+        '<a href="mailto:thabhelo@deepubuntu.com" style="color:#ff6333;">thabhelo@deepubuntu.com</a>' +
+        " and we will remove you right away."
+    );
+  }
+  await env.CONTACTS.put(
+    email,
+    JSON.stringify({
+      ...record,
+      updates: false,
+      unsubscribed_at: new Date().toISOString(),
+    })
+  );
+  if (request.method === "POST") {
+    return new Response(null, { status: 200 });
+  }
+  return unsubscribePage(
+    "You are unsubscribed",
+    "You will not receive product updates from Fraeno. If this was a " +
+      "mistake, just tick the updates box next time you write to us."
+  );
+}
+
 export default {
   async fetch(request, env) {
+    const pathname = new URL(request.url).pathname;
+    if (pathname === "/api/unsubscribe") {
+      if (request.method !== "GET" && request.method !== "POST") {
+        return reject(405, "only GET and POST are accepted");
+      }
+      return handleUnsubscribe(request, env);
+    }
     if (request.method !== "POST") {
       return reject(405, "only POST is accepted");
     }
@@ -144,12 +212,22 @@ export default {
 
     const key = email.toLowerCase();
     const existing = await env.CONTACTS.get(key, "json");
+    const unsubscribeToken =
+      existing && typeof existing.unsubscribe_token === "string"
+        ? existing.unsubscribe_token
+        : crypto.randomUUID();
+    const unsubscribeUrl =
+      "https://fraeno.com/api/unsubscribe?e=" +
+      encodeURIComponent(key) +
+      "&t=" +
+      encodeURIComponent(unsubscribeToken);
     await env.CONTACTS.put(
       key,
       JSON.stringify({
         name,
         email,
         company,
+        unsubscribe_token: unsubscribeToken,
         updates: wantsUpdates || (existing ? existing.updates === true : false),
         last_message: message,
         submissions: existing ? (existing.submissions || 1) + 1 : 1,
@@ -236,8 +314,18 @@ export default {
           "there! Book a call: " +
           "https://calendar.app.google/fB6AtdB5FVSs8YoA9\n\n" +
           "Talk soon,\nThabhelo\n",
-        html: emailShell("We got your request", confirmationBody, 
-          "You are receiving this one-time message because you requested access at fraeno.com."
+        headers: {
+          "List-Unsubscribe": `<${unsubscribeUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
+        html: emailShell(
+          "We got your request",
+          confirmationBody,
+          "You are receiving this one-time message because you requested " +
+            "access at fraeno.com.<br>" +
+            `<a href="${unsubscribeUrl}" style="display:inline-block;` +
+            'padding:12px 16px;font-size:14px;color:#666663;">' +
+            "Unsubscribe from product updates</a>"
         ),
       });
     } catch (error) {
