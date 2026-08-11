@@ -7,7 +7,7 @@
     { "binding": "CONTACTS", "id": "ec99caa03be54a87b0831a587ded27d9" }
   ],
   "routes": [
-    { "pattern": "fraeno.com/api/contact", "zone_name": "fraeno.com" },
-    { "pattern": "www.fraeno.com/api/contact", "zone_name": "fraeno.com" }
+    { "pattern": "fraeno.com/api/*", "zone_name": "fraeno.com" },
+    { "pattern": "www.fraeno.com/api/*", "zone_name": "fraeno.com" }
   ]
 }
