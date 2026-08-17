@@ -731,7 +731,7 @@ class FirestoreEventStore:
             )
             return True
 
-        return await begin_replay(transaction)
+        return bool(await begin_replay(transaction))
 
     async def reject_replay(
         self, delivery_id: str, *, error_kind: str

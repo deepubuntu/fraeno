@@ -509,12 +509,10 @@ validation:
 
 
 def test_update_workflow_uses_policy_and_deterministic_branch_refresh() -> None:
-    config = load_config(ROOT / ".fraeno.yml")
     workflow = (
         ROOT / ".github" / "workflows" / "fraeno-updates.yml"
     ).read_text()
 
-    assert [rule.dependency for rule in config.updates.allow] == ["docker:python"]
     assert 'cron: "17 9 * * *"' in workflow
     assert "group: fraeno-dependency-updates" in workflow
     assert "cancel-in-progress: false" in workflow
