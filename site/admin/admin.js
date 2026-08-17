@@ -1,8 +1,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.0/firebase-app.js";
 import {
+  GoogleAuthProvider,
   getAuth,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.2.0/firebase-auth.js";
 import {
@@ -20,8 +23,12 @@ import {
 
 const login = document.querySelector("[data-login]");
 const dashboard = document.querySelector("[data-dashboard]");
+const adminHeader = document.querySelector("[data-admin-header]");
 const loginForm = document.querySelector("[data-login-form]");
 const loginMessage = document.querySelector("[data-login-message]");
+const emailSignInButton = document.querySelector("[data-email-sign-in]");
+const googleSignInButton = document.querySelector("[data-google-sign-in]");
+const passwordResetButton = document.querySelector("[data-password-reset]");
 const statusLine = document.querySelector("[data-status]");
 const signOutButton = document.querySelector("[data-sign-out]");
 const refreshButton = document.querySelector("[data-refresh]");
@@ -32,11 +39,24 @@ const entitlementDialog = document.querySelector("[data-entitlement-dialog]");
 const entitlementForm = document.querySelector("[data-entitlement-form]");
 const entitlementTitle = document.querySelector("[data-entitlement-title]");
 const entitlementMessage = document.querySelector("[data-entitlement-message]");
+const entitlementCloseButton = document.querySelector("[data-entitlement-close]");
+const entitlementSaveButton = document.querySelector("[data-entitlement-save]");
 
 let auth;
 let database;
 let installations = [];
 let entitlements = new Map();
+
+const setLoginMessage = (message, tone = "error") => {
+  loginMessage.textContent = message;
+  loginMessage.dataset.tone = message ? tone : "";
+};
+
+const setAuthBusy = (busy) => {
+  emailSignInButton.disabled = busy;
+  googleSignInButton.disabled = busy;
+  passwordResetButton.disabled = busy;
+};
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -240,6 +260,7 @@ const optionalTimestamp = (value) =>
 
 const saveEntitlement = async (event) => {
   event.preventDefault();
+  if (event.submitter !== entitlementSaveButton) return;
   const user = auth.currentUser;
   if (!user) return;
   const formData = new FormData(entitlementForm);
@@ -288,33 +309,38 @@ const initialize = async () => {
     const app = initializeApp(config);
     auth = getAuth(app);
     database = getFirestore(app);
+    setAuthBusy(false);
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
         login.hidden = false;
         dashboard.hidden = true;
+        adminHeader.hidden = true;
         signOutButton.hidden = true;
         return;
       }
       const token = await user.getIdTokenResult(true);
       if (token.claims.isAdmin !== true) {
-        loginMessage.textContent = "This account does not have admin access.";
+        setLoginMessage("This account does not have admin access.");
         await signOut(auth);
         return;
       }
       login.hidden = true;
       dashboard.hidden = false;
+      adminHeader.hidden = false;
       signOutButton.hidden = false;
       await loadDashboard();
     });
   } catch (error) {
-    loginMessage.textContent =
-      error instanceof Error ? error.message : "Admin authentication could not start";
+    setLoginMessage(
+      error instanceof Error ? error.message : "Admin authentication could not start",
+    );
   }
 };
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  loginMessage.textContent = "Signing in";
+  setAuthBusy(true);
+  setLoginMessage("Signing in", "progress");
   const formData = new FormData(loginForm);
   try {
     await signInWithEmailAndPassword(
@@ -322,14 +348,55 @@ loginForm.addEventListener("submit", async (event) => {
       String(formData.get("email")),
       String(formData.get("password")),
     );
-    loginMessage.textContent = "";
+    setLoginMessage("");
   } catch {
-    loginMessage.textContent = "Sign in failed. Check your account and try again.";
+    setLoginMessage("Sign in failed. Check your account and try again.");
+  } finally {
+    setAuthBusy(false);
+  }
+});
+
+googleSignInButton.addEventListener("click", async () => {
+  setAuthBusy(true);
+  setLoginMessage("Opening Google sign in", "progress");
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+    setLoginMessage("");
+  } catch {
+    setLoginMessage("Google sign in did not complete. Please try again.");
+  } finally {
+    setAuthBusy(false);
+  }
+});
+
+passwordResetButton.addEventListener("click", async () => {
+  const email = String(loginForm.elements.email.value || "").trim();
+  setLoginMessage("");
+  if (!email) {
+    setLoginMessage("Enter your email address to reset your password.");
+    loginForm.elements.email.focus();
+    return;
+  }
+
+  setAuthBusy(true);
+  passwordResetButton.textContent = "Sending reset link...";
+  try {
+    await sendPasswordResetEmail(auth, email);
+    setLoginMessage(
+      "If an account exists for this email, a password reset link has been sent.",
+      "success",
+    );
+  } catch {
+    setLoginMessage("We could not send a reset link right now. Please try again.");
+  } finally {
+    passwordResetButton.textContent = "Forgot password?";
+    setAuthBusy(false);
   }
 });
 
 signOutButton.addEventListener("click", () => signOut(auth));
 refreshButton.addEventListener("click", loadDashboard);
+entitlementCloseButton.addEventListener("click", () => entitlementDialog.close());
 entitlementForm.addEventListener("submit", saveEntitlement);
 
 initialize();

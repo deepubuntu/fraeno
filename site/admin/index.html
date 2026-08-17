@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Fraeno operations</title>
-    <link rel="stylesheet" href="/admin/admin.css" />
+    <link rel="stylesheet" href="/admin/admin.css?v=20260817a" />
   </head>
   <body>
-    <header class="admin-header">
+    <header class="admin-header" data-admin-header hidden>
       <a class="wordmark" href="/">fraeno</a>
       <p>Operations</p>
       <button class="text-button" data-sign-out hidden>Sign out</button>
@@ -16,27 +16,58 @@
 
     <main>
       <section class="login-shell" data-login>
-        <div class="login-card">
-          <p class="eyebrow">Internal access</p>
-          <h1>Fraeno operations</h1>
-          <p class="muted">Use your approved DeepUbuntu Labs admin account.</p>
-          <form data-login-form>
-            <label>
-              Email
-              <input name="email" type="email" autocomplete="username" required />
-            </label>
-            <label>
-              Password
+        <div class="login-panel">
+          <div class="login-card">
+            <a class="login-wordmark" href="/" aria-label="Fraeno home">fraeno</a>
+            <h1>Admin Login</h1>
+            <p class="muted login-intro">Sign in to access the admin dashboard</p>
+            <form data-login-form>
+              <label for="admin-email">Email Address</label>
               <input
+                id="admin-email"
+                name="email"
+                type="email"
+                autocomplete="username"
+                placeholder="admin@deepubuntu.com"
+                required
+              />
+              <div class="password-heading">
+                <label for="admin-password">Password</label>
+                <button class="reset-button" type="button" data-password-reset disabled>
+                  Forgot password?
+                </button>
+              </div>
+              <input
+                id="admin-password"
                 name="password"
                 type="password"
                 autocomplete="current-password"
+                placeholder="••••••••"
                 required
               />
-            </label>
-            <button class="primary-button" type="submit">Sign in</button>
-          </form>
-          <p class="form-message" data-login-message aria-live="polite"></p>
+              <button
+                class="primary-button auth-button"
+                type="submit"
+                data-email-sign-in
+                disabled
+              >
+                Sign In with Email
+              </button>
+            </form>
+
+            <div class="auth-divider" aria-hidden="true">
+              <span>Or continue with</span>
+            </div>
+
+            <button class="google-button" type="button" data-google-sign-in disabled>
+              <span class="google-mark" aria-hidden="true">G</span>
+              Sign In with Google
+            </button>
+
+            <p class="form-message login-message" data-login-message aria-live="polite"></p>
+            <a class="back-link" href="/">← Back to Home</a>
+          </div>
+          <p class="security-notice">Admin access only • Unauthorized access is monitored</p>
         </div>
       </section>
 
@@ -98,7 +129,14 @@
             <p class="eyebrow">Manual control</p>
             <h2 data-entitlement-title>Entitlement</h2>
           </div>
-          <button class="close-button" value="cancel" aria-label="Close">×</button>
+          <button
+            class="close-button"
+            type="button"
+            data-entitlement-close
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
         <input name="installation_id" type="hidden" />
         <div class="form-grid">
@@ -146,10 +184,17 @@
           <textarea name="note" rows="3" minlength="10" required></textarea>
         </label>
         <p class="form-message" data-entitlement-message aria-live="polite"></p>
-        <button class="primary-button" type="submit" value="save">Save entitlement</button>
+        <button
+          class="primary-button"
+          type="submit"
+          value="save"
+          data-entitlement-save
+        >
+          Save entitlement
+        </button>
       </form>
     </dialog>
 
-    <script type="module" src="/admin/admin.js"></script>
+    <script type="module" src="/admin/admin.js?v=20260817a"></script>
   </body>
 </html>

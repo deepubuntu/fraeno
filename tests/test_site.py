@@ -173,8 +173,21 @@ def test_admin_console_is_protected_and_uses_product_records() -> None:
     headers = (SITE / "_headers").read_text()
     rules = (ROOT / "deploy" / "firebase" / "firestore.rules").read_text()
 
-    assert "Fraeno operations" in page
+    assert "Admin Login" in page
+    assert "Sign in to access the admin dashboard" in page
+    assert "Email Address" in page
     assert 'type="password"' in page
+    assert "Sign In with Email" in page
+    assert "Or continue with" in page
+    assert "Sign In with Google" in page
+    assert "Forgot password?" in page
+    assert "← Back to Home" in page
+    assert "Admin access only • Unauthorized access is monitored" in page
+    assert "Protected by Firebase Authentication" not in page
+    assert "sendPasswordResetEmail" in script
+    assert "signInWithPopup" in script
+    assert "GoogleAuthProvider" in script
+    assert "If an account exists for this email" in script
     assert "Paid customers" in script
     assert "fraeno_installations" in script
     assert "fraeno_entitlements" in script
@@ -183,7 +196,22 @@ def test_admin_console_is_protected_and_uses_product_records() -> None:
     assert "token.claims.isAdmin !== true" in script
     assert "--green: #8db61f" in styles
     assert "https://www.gstatic.com" in headers
+    assert "script-src 'self' https://apis.google.com" in headers
+    assert "frame-src https://accounts.google.com" in headers
+    assert "https://deepubuntu-32f9e.firebaseapp.com" in headers
     assert "/admin/" in headers and "Cache-Control: no-store" in headers
+    public_headers, admin_headers = headers.split("/admin/*", maxsplit=1)
+    assert "https://www.gstatic.com" not in public_headers
+    assert "https://identitytoolkit.googleapis.com" not in public_headers
+    assert "https://www.gstatic.com" in admin_headers
+    assert "https://identitytoolkit.googleapis.com" in admin_headers
+    assert "Cross-Origin-Opener-Policy: same-origin-allow-popups" in admin_headers
+    assert 'type="button"' in page
+    assert "data-entitlement-close" in page
+    assert "data-entitlement-save" in page
+    assert "event.submitter !== entitlementSaveButton" in script
+    assert "/admin/admin.css?v=" in page
+    assert "/admin/admin.js?v=" in page
     assert "match /fraeno_installations" in rules
     assert "match /fraeno_usage" in rules
     assert "match /fraeno_entitlements" in rules

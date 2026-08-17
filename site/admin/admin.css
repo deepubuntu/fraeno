@@ -81,17 +81,31 @@ main {
 
 .login-shell {
   display: grid;
-  min-height: calc(100vh - 73px);
+  min-height: 100vh;
   place-items: center;
   padding: 48px 0;
 }
 
-.login-card {
+.login-panel {
   width: min(100%, 460px);
+}
+
+.login-card {
   padding: clamp(28px, 5vw, 48px);
   border: 1px solid var(--line);
   border-radius: 28px;
   background: var(--panel);
+}
+
+.login-wordmark {
+  display: block;
+  width: fit-content;
+  margin: 0 auto 28px;
+  color: var(--ink);
+  font-size: 1.55rem;
+  font-weight: 670;
+  letter-spacing: -0.045em;
+  text-decoration: none;
 }
 
 h1,
@@ -109,7 +123,14 @@ h1 {
 }
 
 .login-card h1 {
+  margin-bottom: 8px;
   font-size: clamp(2.2rem, 8vw, 3.5rem);
+  text-align: center;
+}
+
+.login-intro {
+  margin-bottom: 32px;
+  text-align: center;
 }
 
 h2 {
@@ -143,6 +164,10 @@ form {
   gap: 18px;
 }
 
+.login-card form {
+  gap: 10px;
+}
+
 label {
   color: var(--muted);
   font-size: 0.84rem;
@@ -167,6 +192,29 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(141, 182, 31, 0.13);
 }
 
+.password-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.reset-button {
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.84rem;
+}
+
+.reset-button:hover,
+.reset-button:focus-visible,
+.back-link:hover,
+.back-link:focus-visible {
+  color: var(--ink);
+}
+
 .primary-button,
 .secondary-button,
 .text-button,
@@ -180,6 +228,94 @@ textarea:focus {
   padding: 0 22px;
   color: #fff;
   background: var(--ink);
+}
+
+.auth-button {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.auth-divider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 28px 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.auth-divider::before {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--line);
+  content: "";
+}
+
+.auth-divider span {
+  position: relative;
+  padding: 0 14px;
+  background: var(--panel);
+}
+
+.google-button {
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  background: transparent;
+}
+
+.google-button:hover,
+.google-button:focus-visible {
+  background: #fafaf8;
+}
+
+.google-mark {
+  font-weight: 700;
+}
+
+.auth-button:disabled,
+.google-button:disabled,
+.reset-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.login-message {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.login-message[data-tone="success"] {
+  color: #4d6810;
+}
+
+.login-message[data-tone="progress"] {
+  color: var(--muted);
+}
+
+.back-link {
+  display: block;
+  width: fit-content;
+  margin: 22px auto 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-decoration: none;
+}
+
+.security-notice {
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
 }
 
 .secondary-button {
