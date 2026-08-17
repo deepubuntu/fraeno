@@ -4,7 +4,7 @@ Fraeno publishes its validation runner directly to Google Artifact Registry.
 The target repository is:
 
 ```text
-us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-runner
+us-central1-docker.pkg.dev/fraeno-prod/fraeno-runner
 ```
 
 The release workflow is manual until production identity and review gates are
@@ -24,14 +24,14 @@ GCP_WORKLOAD_IDENTITY_PROVIDER
 GCP_RELEASE_SERVICE_ACCOUNT
 ```
 
-For the current GCP target, the first three values are `deepubuntu-32f9e`,
+For the current GCP target, the first three values are `fraeno-prod`,
 `us-central1`, and `fraeno-runner`.
 
 Use these exact values for the remaining two variables:
 
 ```text
-GCP_WORKLOAD_IDENTITY_PROVIDER=projects/286435890377/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-runner
-GCP_RELEASE_SERVICE_ACCOUNT=fraeno-runner-publisher@deepubuntu-32f9e.iam.gserviceaccount.com
+GCP_WORKLOAD_IDENTITY_PROVIDER=projects/1001829102083/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-runner
+GCP_RELEASE_SERVICE_ACCOUNT=fraeno-runner-publisher@fraeno-prod.iam.gserviceaccount.com
 ```
 
 The workload identity provider must accept only tokens where the repository is
@@ -55,7 +55,7 @@ existing repository:
 
 ```bash
 gcloud artifacts repositories update fraeno-runner \
-  --project deepubuntu-32f9e \
+  --project fraeno-prod \
   --location us-central1 \
   --immutable-tags
 ```
@@ -136,18 +136,18 @@ worker from one image built from the exact reviewed commit. It uses the private,
 immutable repository:
 
 ```text
-us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-control-plane
+us-central1-docker.pkg.dev/fraeno-prod/fraeno-control-plane
 ```
 
 Create the `control-plane-production` GitHub environment with the same five
 variable names used by the runner environment. Use these values:
 
 ```text
-GCP_PROJECT_ID=deepubuntu-32f9e
+GCP_PROJECT_ID=fraeno-prod
 GCP_ARTIFACT_REGISTRY_LOCATION=us-central1
 GCP_ARTIFACT_REGISTRY_REPOSITORY=fraeno-control-plane
-GCP_WORKLOAD_IDENTITY_PROVIDER=projects/286435890377/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-control-plane
-GCP_RELEASE_SERVICE_ACCOUNT=fraeno-control-plane-releaser@deepubuntu-32f9e.iam.gserviceaccount.com
+GCP_WORKLOAD_IDENTITY_PROVIDER=projects/1001829102083/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-control-plane
+GCP_RELEASE_SERVICE_ACCOUNT=fraeno-control-plane-releaser@fraeno-prod.iam.gserviceaccount.com
 ```
 
 The dedicated provider accepts only tokens for `deepubuntu/fraeno`, repository
@@ -244,7 +244,7 @@ audit before ever enabling deletion:
 
 ```bash
 gcloud artifacts repositories set-cleanup-policies fraeno-control-plane \
-  --project deepubuntu-32f9e \
+  --project fraeno-prod \
   --location us-central1 \
   --policy deploy/gcp/control-plane-cleanup-policy.json \
   --dry-run

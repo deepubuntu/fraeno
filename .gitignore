@@ -10,6 +10,8 @@ dist/
 build/
 install/
 log/
+test-results/
+playwright-report/
 .fraeno/
 fraeno-report.json
 fraeno-*-report.json

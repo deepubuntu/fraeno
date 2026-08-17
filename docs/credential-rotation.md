@@ -66,10 +66,10 @@ Create a dedicated workload identity provider named
 Create the `credential-rotation` GitHub environment with:
 
 ```text
-GCP_PROJECT_ID=deepubuntu-32f9e
+GCP_PROJECT_ID=fraeno-prod
 GCP_LOCATION=us-central1
-GCP_WORKLOAD_IDENTITY_PROVIDER=projects/286435890377/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-credential-rotation
-GCP_ROTATION_SERVICE_ACCOUNT=fraeno-credential-rotator@deepubuntu-32f9e.iam.gserviceaccount.com
+GCP_WORKLOAD_IDENTITY_PROVIDER=projects/1001829102083/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-credential-rotation
+GCP_ROTATION_SERVICE_ACCOUNT=fraeno-credential-rotator@fraeno-prod.iam.gserviceaccount.com
 ```
 
 Require a reviewer for this environment when the GitHub plan supports it.
@@ -87,7 +87,7 @@ openssl rand -hex 32 > webhook-secret.new
 test "$(wc -c < webhook-secret.new)" -eq 65
 tr -d '\n' < webhook-secret.new |
   gcloud secrets versions add fraeno-github-webhook-secret \
-    --project=deepubuntu-32f9e \
+    --project=fraeno-prod \
     --data-file=-
 ```
 
@@ -97,7 +97,7 @@ Manager:
 
 ```bash
 gcloud secrets versions add fraeno-github-private-key \
-  --project=deepubuntu-32f9e \
+  --project=fraeno-prod \
   --data-file=/path/to/downloaded-private-key.pem
 ```
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-project="deepubuntu-32f9e"
-project_number="286435890377"
+project="fraeno-prod"
+project_number="1001829102083"
 location="us-central1"
 repository="deepubuntu/fraeno"
 environment="credential-rotation"

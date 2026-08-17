@@ -42,11 +42,11 @@ jobs:
       GCP_REPOSITORY: ${{ vars.GCP_ARTIFACT_REGISTRY_REPOSITORY }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_RELEASE_SERVICE_ACCOUNT: ${{ vars.GCP_RELEASE_SERVICE_ACCOUNT }}
-      EXPECTED_GCP_PROJECT_ID: deepubuntu-32f9e
+      EXPECTED_GCP_PROJECT_ID: fraeno-prod
       EXPECTED_GCP_LOCATION: us-central1
       EXPECTED_GCP_REPOSITORY: fraeno-runner
-      EXPECTED_GCP_WORKLOAD_IDENTITY_PROVIDER: projects/286435890377/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-runner
-      EXPECTED_GCP_RELEASE_SERVICE_ACCOUNT: fraeno-runner-publisher@deepubuntu-32f9e.iam.gserviceaccount.com
+      EXPECTED_GCP_WORKLOAD_IDENTITY_PROVIDER: projects/1001829102083/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-runner
+      EXPECTED_GCP_RELEASE_SERVICE_ACCOUNT: fraeno-runner-publisher@fraeno-prod.iam.gserviceaccount.com
       PYTHONPATH: src
     steps:
       - name: Check out the exact reviewed commit

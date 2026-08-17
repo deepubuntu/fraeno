@@ -4,8 +4,8 @@
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
-    "FIREBASE_PROJECT_ID": "deepubuntu-32f9e",
-    "FIREBASE_AUTH_DOMAIN": "deepubuntu-32f9e.firebaseapp.com"
+    "FIREBASE_PROJECT_ID": "fraeno-prod",
+    "FIREBASE_AUTH_DOMAIN": "fraeno-prod.firebaseapp.com"
   },
   "send_email": [{ "name": "EMAIL" }],
   "kv_namespaces": [
@@ -19,5 +19,22 @@
     "enabled": true,
     "logs": { "head_sampling_rate": 1 },
     "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+  },
+  "env": {
+    "staging": {
+      "name": "fraeno-contact-staging",
+      "vars": {
+        "FIREBASE_PROJECT_ID": "fraeno-staging",
+        "FIREBASE_AUTH_DOMAIN": "fraeno-staging.firebaseapp.com"
+      },
+      "kv_namespaces": [
+        { "binding": "CONTACTS", "id": "da4a2b87e636466f8459c99b9fcd7ed0" }
+      ],
+      "observability": {
+        "enabled": true,
+        "logs": { "head_sampling_rate": 1 },
+        "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+      }
+    }
   }
 }
