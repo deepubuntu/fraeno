@@ -61,6 +61,85 @@ class RepositoryRecord:
 
 
 @dataclass(frozen=True)
+class InstallationRecord:
+    installation_id: int
+    account_id: int
+    account_login: str
+    account_type: str
+    status: str
+    installed_at: datetime
+    updated_at: datetime
+    connected_repositories: int = 0
+    last_active_at: datetime | None = None
+    first_check_at: datetime | None = None
+    recent_check_at: datetime | None = None
+    activated_at: datetime | None = None
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        installation_id: int,
+        account_id: int,
+        account_login: str,
+        account_type: str,
+        status: str = "installed",
+        connected_repositories: int = 0,
+    ) -> InstallationRecord:
+        now = utc_now()
+        return cls(
+            installation_id=installation_id,
+            account_id=account_id,
+            account_login=account_login.lower(),
+            account_type=account_type,
+            status=status,
+            installed_at=now,
+            updated_at=now,
+            connected_repositories=max(connected_repositories, 0),
+        )
+
+
+@dataclass(frozen=True)
+class EntitlementRecord:
+    installation_id: int
+    status: str
+    plan: str
+    source: str
+    billing_status: str
+    starts_at: datetime
+    updated_at: datetime
+    updated_by: str
+    note: str = ""
+    ends_at: datetime | None = None
+    grace_ends_at: datetime | None = None
+    stripe_customer_id: str = ""
+    stripe_subscription_id: str = ""
+
+    def permits(self, observed_at: datetime | None = None) -> bool:
+        now = observed_at or utc_now()
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        if self.starts_at > now:
+            return False
+        if self.status in {"trial", "active"}:
+            return self.ends_at is None or self.ends_at > now
+        if self.status == "grace":
+            return self.grace_ends_at is not None and self.grace_ends_at > now
+        return False
+
+
+@dataclass(frozen=True)
+class UsageRecord:
+    installation_id: int
+    account_login: str
+    period: str
+    checks_started: int
+    checks_completed: int
+    updated_at: datetime
+    last_check_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class RunRecord:
     workflow_run_id: int
     check_run_id: int
@@ -175,6 +254,39 @@ class EventStore(Protocol):
         self, installation_id: int
     ) -> list[RepositoryRecord]: ...
 
+    async def upsert_installation(self, record: InstallationRecord) -> None: ...
+
+    async def get_installation(
+        self, installation_id: int
+    ) -> InstallationRecord | None: ...
+
+    async def list_installations(self) -> list[InstallationRecord]: ...
+
+    async def upsert_entitlement(self, record: EntitlementRecord) -> None: ...
+
+    async def get_entitlement(
+        self, installation_id: int
+    ) -> EntitlementRecord | None: ...
+
+    async def list_entitlements(self) -> list[EntitlementRecord]: ...
+
+    async def record_check_started(
+        self,
+        installation_id: int,
+        account_login: str,
+        observed_at: datetime,
+        first_check_at: datetime | None = None,
+    ) -> None: ...
+
+    async def record_check_completed(
+        self,
+        installation_id: int,
+        account_login: str,
+        observed_at: datetime,
+    ) -> None: ...
+
+    async def list_usage(self, period: str | None = None) -> list[UsageRecord]: ...
+
 
 class MemoryEventStore:
     def __init__(self, *, delivery_retention_days: int = 14) -> None:
@@ -183,6 +295,9 @@ class MemoryEventStore:
         self._runs: dict[int, RunRecord] = {}
         self._active_runs: dict[tuple[int, int], RunRecord] = {}
         self._repositories: dict[int, RepositoryRecord] = {}
+        self._installations: dict[int, InstallationRecord] = {}
+        self._entitlements: dict[int, EntitlementRecord] = {}
+        self._usage: dict[tuple[int, str], UsageRecord] = {}
         self._replay_audit: list[dict[str, Any]] = []
         self._lock = asyncio.Lock()
 
@@ -348,6 +463,94 @@ class MemoryEventStore:
                 record
                 for record in self._repositories.values()
                 if record.installation_id == installation_id
+            ]
+
+    async def upsert_installation(self, record: InstallationRecord) -> None:
+        async with self._lock:
+            self._installations[record.installation_id] = record
+
+    async def get_installation(
+        self, installation_id: int
+    ) -> InstallationRecord | None:
+        async with self._lock:
+            return self._installations.get(installation_id)
+
+    async def list_installations(self) -> list[InstallationRecord]:
+        async with self._lock:
+            return list(self._installations.values())
+
+    async def upsert_entitlement(self, record: EntitlementRecord) -> None:
+        async with self._lock:
+            self._entitlements[record.installation_id] = record
+
+    async def get_entitlement(
+        self, installation_id: int
+    ) -> EntitlementRecord | None:
+        async with self._lock:
+            return self._entitlements.get(installation_id)
+
+    async def list_entitlements(self) -> list[EntitlementRecord]:
+        async with self._lock:
+            return list(self._entitlements.values())
+
+    async def record_check_started(
+        self,
+        installation_id: int,
+        account_login: str,
+        observed_at: datetime,
+        first_check_at: datetime | None = None,
+    ) -> None:
+        async with self._lock:
+            period = observed_at.strftime("%Y-%m")
+            key = (installation_id, period)
+            current = self._usage.get(key)
+            self._usage[key] = UsageRecord(
+                installation_id=installation_id,
+                account_login=account_login,
+                period=period,
+                checks_started=(current.checks_started if current else 0) + 1,
+                checks_completed=current.checks_completed if current else 0,
+                updated_at=observed_at,
+                last_check_at=observed_at,
+            )
+            installation = self._installations.get(installation_id)
+            if installation is not None:
+                first_check = installation.first_check_at or first_check_at or observed_at
+                self._installations[installation_id] = replace(
+                    installation,
+                    last_active_at=observed_at,
+                    first_check_at=first_check,
+                    recent_check_at=observed_at,
+                    activated_at=installation.activated_at or first_check,
+                    updated_at=observed_at,
+                )
+
+    async def record_check_completed(
+        self,
+        installation_id: int,
+        account_login: str,
+        observed_at: datetime,
+    ) -> None:
+        async with self._lock:
+            period = observed_at.strftime("%Y-%m")
+            key = (installation_id, period)
+            current = self._usage.get(key)
+            self._usage[key] = UsageRecord(
+                installation_id=installation_id,
+                account_login=account_login,
+                period=period,
+                checks_started=current.checks_started if current else 0,
+                checks_completed=(current.checks_completed if current else 0) + 1,
+                updated_at=observed_at,
+                last_check_at=observed_at,
+            )
+
+    async def list_usage(self, period: str | None = None) -> list[UsageRecord]:
+        async with self._lock:
+            return [
+                record
+                for record in self._usage.values()
+                if period is None or record.period == period
             ]
 
     async def _set_delivery_status(
@@ -636,6 +839,129 @@ class FirestoreEventStore:
                 records.append(RepositoryRecord(**data))
         return records
 
+    async def upsert_installation(self, record: InstallationRecord) -> None:
+        await self._client.collection("fraeno_installations").document(
+            str(record.installation_id)
+        ).set(asdict(record))
+
+    async def get_installation(
+        self, installation_id: int
+    ) -> InstallationRecord | None:
+        snapshot = await self._client.collection("fraeno_installations").document(
+            str(installation_id)
+        ).get()
+        return self._installation_from_snapshot(snapshot)
+
+    async def list_installations(self) -> list[InstallationRecord]:
+        records: list[InstallationRecord] = []
+        async for snapshot in self._client.collection("fraeno_installations").stream():
+            record = self._installation_from_snapshot(snapshot)
+            if record is not None:
+                records.append(record)
+        return records
+
+    async def upsert_entitlement(self, record: EntitlementRecord) -> None:
+        await self._client.collection("fraeno_entitlements").document(
+            str(record.installation_id)
+        ).set(asdict(record))
+
+    async def get_entitlement(
+        self, installation_id: int
+    ) -> EntitlementRecord | None:
+        snapshot = await self._client.collection("fraeno_entitlements").document(
+            str(installation_id)
+        ).get()
+        return self._entitlement_from_snapshot(snapshot)
+
+    async def list_entitlements(self) -> list[EntitlementRecord]:
+        records: list[EntitlementRecord] = []
+        async for snapshot in self._client.collection("fraeno_entitlements").stream():
+            record = self._entitlement_from_snapshot(snapshot)
+            if record is not None:
+                records.append(record)
+        return records
+
+    async def record_check_started(
+        self,
+        installation_id: int,
+        account_login: str,
+        observed_at: datetime,
+        first_check_at: datetime | None = None,
+    ) -> None:
+        from google.cloud import firestore
+
+        period = observed_at.strftime("%Y-%m")
+        usage_reference = self._client.collection("fraeno_usage").document(
+            f"{installation_id}-{period}"
+        )
+        installation_reference = self._client.collection(
+            "fraeno_installations"
+        ).document(str(installation_id))
+        first_check = first_check_at
+        batch = self._client.batch()
+        batch.set(
+            usage_reference,
+            {
+                "installation_id": installation_id,
+                "account_login": account_login,
+                "period": period,
+                "checks_started": firestore.Increment(1),
+                "checks_completed": firestore.Increment(0),
+                "last_check_at": observed_at,
+                "updated_at": observed_at,
+            },
+            merge=True,
+        )
+        batch.set(
+            installation_reference,
+            {
+                "last_active_at": observed_at,
+                "first_check_at": first_check or observed_at,
+                "recent_check_at": observed_at,
+                "activated_at": (
+                    first_check or observed_at
+                ),
+                "updated_at": observed_at,
+            },
+            merge=True,
+        )
+        await batch.commit()
+
+    async def record_check_completed(
+        self,
+        installation_id: int,
+        account_login: str,
+        observed_at: datetime,
+    ) -> None:
+        from google.cloud import firestore
+
+        period = observed_at.strftime("%Y-%m")
+        await self._client.collection("fraeno_usage").document(
+            f"{installation_id}-{period}"
+        ).set(
+            {
+                "installation_id": installation_id,
+                "account_login": account_login,
+                "period": period,
+                "checks_started": firestore.Increment(0),
+                "checks_completed": firestore.Increment(1),
+                "last_check_at": observed_at,
+                "updated_at": observed_at,
+            },
+            merge=True,
+        )
+
+    async def list_usage(self, period: str | None = None) -> list[UsageRecord]:
+        query: Any = self._client.collection("fraeno_usage")
+        if period is not None:
+            query = query.where("period", "==", period)
+        records: list[UsageRecord] = []
+        async for snapshot in query.stream():
+            data = snapshot.to_dict()
+            if isinstance(data, dict):
+                records.append(UsageRecord(**data))
+        return records
+
     async def _update_delivery(
         self,
         delivery_id: str,
@@ -667,6 +993,24 @@ class FirestoreEventStore:
         if not isinstance(data, dict):
             return None
         return RunRecord(**data)
+
+    @staticmethod
+    def _installation_from_snapshot(snapshot: Any) -> InstallationRecord | None:
+        if not snapshot.exists:
+            return None
+        data = snapshot.to_dict()
+        if not isinstance(data, dict):
+            return None
+        return InstallationRecord(**data)
+
+    @staticmethod
+    def _entitlement_from_snapshot(snapshot: Any) -> EntitlementRecord | None:
+        if not snapshot.exists:
+            return None
+        data = snapshot.to_dict()
+        if not isinstance(data, dict):
+            return None
+        return EntitlementRecord(**data)
 
     @staticmethod
     def _delivery_from_data(

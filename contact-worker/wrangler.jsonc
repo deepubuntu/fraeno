@@ -2,6 +2,11 @@
   "name": "fraeno-contact",
   "main": "src/index.js",
   "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "FIREBASE_PROJECT_ID": "deepubuntu-32f9e",
+    "FIREBASE_AUTH_DOMAIN": "deepubuntu-32f9e.firebaseapp.com"
+  },
   "send_email": [{ "name": "EMAIL" }],
   "kv_namespaces": [
     { "binding": "CONTACTS", "id": "ec99caa03be54a87b0831a587ded27d9" }
@@ -9,5 +14,10 @@
   "routes": [
     { "pattern": "fraeno.com/api/*", "zone_name": "fraeno.com" },
     { "pattern": "www.fraeno.com/api/*", "zone_name": "fraeno.com" }
-  ]
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+  }
 }

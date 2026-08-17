@@ -38,6 +38,10 @@ class MultiRepositoryGitHub:
         self.cancellations: list[int] = []
         self.next_check_id = 200
         self.next_run_id = 300
+        self.installations: list[dict[str, Any]] = []
+
+    async def app_installations(self) -> list[dict[str, Any]]:
+        return self.installations
 
     async def installation_token(
         self, installation_id: int, repository_id: int
@@ -322,6 +326,51 @@ async def test_reconciler_recovers_lost_completion_and_stale_delivery() -> None:
     assert result.checks_completed == 1
     assert ("stale_check", 1.0) in metrics.values
     assert any(name == "run_duration_seconds" for name, _ in metrics.values)
+
+
+@pytest.mark.anyio
+async def test_reconciler_backfills_existing_github_installations() -> None:
+    settings = AppSettings("1", "key")
+    client = MultiRepositoryGitHub(settings)
+    client.installations = [
+        {
+            "id": 42,
+            "created_at": "2026-08-01T12:00:00Z",
+            "account": {
+                "id": 224500479,
+                "login": "DeepUbuntu",
+                "type": "Organization",
+            },
+        },
+        {
+            "id": 43,
+            "created_at": "invalid",
+            "suspended_at": "2026-08-16T12:00:00Z",
+            "account": {
+                "id": 99,
+                "login": "Customer-Robotics",
+                "type": "Organization",
+            },
+        },
+        {"id": "bad", "account": {}},
+    ]
+    store = MemoryEventStore()
+    handler = EventHandler(client, store)  # type: ignore[arg-type]
+    reconciler = Reconciler(client, store, handler, settings)  # type: ignore[arg-type]
+    observed_at = datetime(2026, 8, 17, 12, tzinfo=timezone.utc)
+
+    result = await reconciler.reconcile(now=observed_at)
+
+    deepubuntu = await store.get_installation(42)
+    suspended = await store.get_installation(43)
+    assert result.installations_seen == 3
+    assert result.installations_synced == 2
+    assert deepubuntu is not None
+    assert deepubuntu.account_login == "deepubuntu"
+    assert deepubuntu.installed_at == datetime(
+        2026, 8, 1, 12, tzinfo=timezone.utc
+    )
+    assert suspended is not None and suspended.status == "suspended"
 
 
 @pytest.mark.anyio

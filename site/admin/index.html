@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Fraeno operations</title>
+    <link rel="stylesheet" href="/admin/admin.css" />
+  </head>
+  <body>
+    <header class="admin-header">
+      <a class="wordmark" href="/">fraeno</a>
+      <p>Operations</p>
+      <button class="text-button" data-sign-out hidden>Sign out</button>
+    </header>
+
+    <main>
+      <section class="login-shell" data-login>
+        <div class="login-card">
+          <p class="eyebrow">Internal access</p>
+          <h1>Fraeno operations</h1>
+          <p class="muted">Use your approved DeepUbuntu Labs admin account.</p>
+          <form data-login-form>
+            <label>
+              Email
+              <input name="email" type="email" autocomplete="username" required />
+            </label>
+            <label>
+              Password
+              <input
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
+            </label>
+            <button class="primary-button" type="submit">Sign in</button>
+          </form>
+          <p class="form-message" data-login-message aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="dashboard" data-dashboard hidden>
+        <div class="dashboard-title">
+          <div>
+            <p class="eyebrow">Customer and entitlement layer</p>
+            <h1>Fraeno at a glance</h1>
+          </div>
+          <button class="text-button" data-refresh>Refresh</button>
+        </div>
+
+        <p class="status-line" data-status aria-live="polite">Loading live records</p>
+
+        <div class="metric-grid" data-metrics></div>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Product accounts</p>
+              <h2>GitHub installations</h2>
+            </div>
+            <p class="muted">The installation ID is the customer key.</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Installation</th>
+                  <th>Product status</th>
+                  <th>Checks this month</th>
+                  <th>Last active</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody data-installations></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Access requests</p>
+              <h2>Leads</h2>
+            </div>
+            <p class="muted">Requests received through fraeno.com.</p>
+          </div>
+          <div class="lead-grid" data-leads></div>
+        </section>
+      </section>
+    </main>
+
+    <dialog data-entitlement-dialog>
+      <form class="entitlement-form" data-entitlement-form method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Manual control</p>
+            <h2 data-entitlement-title>Entitlement</h2>
+          </div>
+          <button class="close-button" value="cancel" aria-label="Close">×</button>
+        </div>
+        <input name="installation_id" type="hidden" />
+        <div class="form-grid">
+          <label>
+            Status
+            <select name="status" required>
+              <option value="trial">Trial</option>
+              <option value="active">Active</option>
+              <option value="grace">Grace</option>
+              <option value="suspended">Suspended</option>
+              <option value="expired">Expired</option>
+            </select>
+          </label>
+          <label>
+            Plan
+            <input name="plan" value="private_beta" required />
+          </label>
+          <label>
+            Source
+            <select name="source" required>
+              <option value="manual">Manual</option>
+              <option value="stripe">Stripe</option>
+              <option value="marketplace">Marketplace</option>
+            </select>
+          </label>
+          <label>
+            Billing
+            <select name="billing_status" required>
+              <option value="unpaid">Unpaid</option>
+              <option value="paid">Paid</option>
+              <option value="comped">Comped</option>
+            </select>
+          </label>
+          <label>
+            Ends at
+            <input name="ends_at" type="datetime-local" />
+          </label>
+          <label>
+            Grace ends at
+            <input name="grace_ends_at" type="datetime-local" />
+          </label>
+        </div>
+        <label>
+          Reason
+          <textarea name="note" rows="3" minlength="10" required></textarea>
+        </label>
+        <p class="form-message" data-entitlement-message aria-live="polite"></p>
+        <button class="primary-button" type="submit" value="save">Save entitlement</button>
+      </form>
+    </dialog>
+
+    <script type="module" src="/admin/admin.js"></script>
+  </body>
+</html>

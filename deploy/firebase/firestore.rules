@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null && request.auth.token.isAdmin == true;
+    }
+
+    match /admins/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /dataset-access-requests/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /faqs/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /documentation/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /applications/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /fraeno_installations/{document=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /fraeno_usage/{document=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /fraeno_entitlements/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /fraeno_admin_audit/{document=**} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

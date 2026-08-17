@@ -84,6 +84,10 @@ FRAENO_REPOSITORY_RETENTION_DAYS=30
 FRAENO_REPLAY_AUDIT_RETENTION_DAYS=90
 ```
 
+`FRAENO_APPROVED_INSTALLATION_LOGINS` is an emergency override, not the
+customer database. All other installations are admitted through an active
+Firestore entitlement keyed by the immutable GitHub installation ID.
+
 During the same rotation, the worker also receives:
 
 ```text
