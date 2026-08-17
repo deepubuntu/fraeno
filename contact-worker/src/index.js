@@ -47,13 +47,6 @@ function emailShell(heading, bodyHtml, footerLine) {
   );
 }
 
-function emailRow(label, value) {
-  return (
-    `<p style="margin:0 0 8px;font-family:${EMAIL_FONT};font-size:15px;line-height:1.6;color:#151515;">` +
-    `<span style="color:#666663;">${label}</span>&nbsp;&nbsp;${value}</p>`
-  );
-}
-
 function emailParagraph(text) {
   return (
     `<p style="margin:16px 0 0;font-family:${EMAIL_FONT};font-size:16px;line-height:1.7;color:#151515;">` +
@@ -69,14 +62,6 @@ function emailButton(label, href) {
     `<a href="${href}" style="display:inline-block;padding:13px 28px;font-family:${EMAIL_FONT};font-size:15px;font-weight:500;color:#ffffff;text-decoration:none;">${label}</a>` +
     "</td></tr></table>"
   );
-}
-
-function escapeHtml(value) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 function validate(payload) {
@@ -235,42 +220,6 @@ export default {
         last_seen: new Date().toISOString(),
       })
     );
-    const subject = `Fraeno access request from ${name}`;
-    const lines = [
-      `Name: ${name}`,
-      `Email: ${email}`,
-      company ? `Company: ${company}` : null,
-      wantsUpdates ? "Opted into product updates" : null,
-      message ? "" : null,
-      message || null,
-    ].filter((line) => line !== null);
-
-    const notificationBody =
-      emailRow("Name", escapeHtml(name)) +
-      emailRow("Email", escapeHtml(email)) +
-      (company ? emailRow("Company", escapeHtml(company)) : "") +
-      (wantsUpdates ? emailRow("Updates", "Opted in") : "") +
-      (message
-        ? emailParagraph(escapeHtml(message).replaceAll("\n", "<br>"))
-        : "");
-    try {
-      await env.EMAIL.send({
-        to: NOTIFY_ADDRESS,
-        from: { email: FROM_ADDRESS, name: "Fraeno website" },
-        replyTo: { email, name },
-        subject,
-        text: lines.join("\n"),
-        html: emailShell(
-          "New access request",
-          '<div style="margin-top:14px;">' + notificationBody + "</div>",
-          "Sent by the fraeno.com contact form."
-        ),
-      });
-    } catch (error) {
-      console.log(`contact send failed: ${error}`);
-      return reject(502, "the message could not be delivered; email thabhelo@deepubuntu.com directly");
-    }
-
     try {
       const confirmationBody =
         emailParagraph("Hi there,") +

@@ -161,7 +161,9 @@ def test_site_submits_access_requests_through_the_contact_worker() -> None:
     worker_source = worker.read_text()
     assert "MINIMUM_DWELL_MS" in worker_source
     assert "payload.website" in worker_source
-    assert "escapeHtml" in worker_source
+    assert worker_source.count("await env.EMAIL.send") == 1
+    assert 'subject: "We received your Fraeno access request"' in worker_source
+    assert "Fraeno access request from" not in worker_source
 
 
 def test_site_uses_product_motion_without_decorative_media() -> None:
