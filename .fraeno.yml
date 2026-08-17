@@ -4,6 +4,10 @@ project:
   name: fraeno-live-ros2-fixture
 
 updates:
+  # Keep Fraeno's own updater on deployable runtime dependencies. The
+  # deliberately outdated manifests under fixtures/ are test inputs.
+  allow:
+    - docker:python
   update_types:
     - major
     - minor
