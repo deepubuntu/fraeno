@@ -20,8 +20,8 @@ async function adminToken(privateKey, keyId, overrides = {}) {
   const header = base64url(JSON.stringify({ alg: "RS256", kid: keyId }));
   const payload = base64url(
     JSON.stringify({
-      aud: "deepubuntu-32f9e",
-      iss: "https://securetoken.google.com/deepubuntu-32f9e",
+      aud: "fraeno-prod",
+      iss: "https://securetoken.google.com/fraeno-prod",
       sub: "admin-user",
       exp: now + 3600,
       iat: now,
@@ -100,16 +100,16 @@ test("admin configuration exposes only the public Firebase client settings", asy
     new Request("https://fraeno.com/api/admin/config"),
     {
       FIREBASE_API_KEY: "public-browser-key",
-      FIREBASE_PROJECT_ID: "deepubuntu-32f9e",
-      FIREBASE_AUTH_DOMAIN: "deepubuntu-32f9e.firebaseapp.com",
+      FIREBASE_PROJECT_ID: "fraeno-prod",
+      FIREBASE_AUTH_DOMAIN: "fraeno-prod.firebaseapp.com",
     }
   );
 
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     apiKey: "public-browser-key",
-    authDomain: "deepubuntu-32f9e.firebaseapp.com",
-    projectId: "deepubuntu-32f9e",
+    authDomain: "fraeno-prod.firebaseapp.com",
+    projectId: "fraeno-prod",
   });
   assert.equal(response.headers.get("Cache-Control"), "no-store");
 });
@@ -148,7 +148,7 @@ test("only a valid Firebase admin token can read access requests", async () => {
     ],
   ]);
   const env = {
-    FIREBASE_PROJECT_ID: "deepubuntu-32f9e",
+    FIREBASE_PROJECT_ID: "fraeno-prod",
     CONTACTS: {
       async list() {
         return {

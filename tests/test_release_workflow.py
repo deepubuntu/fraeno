@@ -15,7 +15,7 @@ CONTROL_RELEASE_WORKFLOW = (
     ROOT / ".github" / "workflows" / "release-control-plane.yml"
 )
 CONTROL_IMAGE = (
-    "us-central1-docker.pkg.dev/deepubuntu-32f9e/"
+    "us-central1-docker.pkg.dev/fraeno-prod/"
     "fraeno-control-plane/control-plane"
 )
 CONTROL_COMMIT = "a" * 40
@@ -23,7 +23,7 @@ CONTROL_DIGEST = "sha256:" + ("b" * 64)
 SECOND_CONTROL_DIGEST = "sha256:" + ("c" * 64)
 RUNTIME_CONTROL_DIGEST = "sha256:" + ("d" * 64)
 CONTROL_PACKAGE_ROOT = (
-    "projects/deepubuntu-32f9e/locations/us-central1/repositories/"
+    "projects/fraeno-prod/locations/us-central1/repositories/"
     "fraeno-control-plane/packages/control-plane"
 )
 CONTROL_TAG_ROOT = f"{CONTROL_PACKAGE_ROOT}/tags"
@@ -182,17 +182,17 @@ def test_release_workflow_uses_wif_and_direct_artifact_registry() -> None:
     assert "service_account:" in workflow
     assert "credentials_json" not in workflow
     assert "GCP_ARTIFACT_REGISTRY_REPOSITORY" in workflow
-    assert "EXPECTED_GCP_PROJECT_ID: deepubuntu-32f9e" in workflow
+    assert "EXPECTED_GCP_PROJECT_ID: fraeno-prod" in workflow
     assert "EXPECTED_GCP_LOCATION: us-central1" in workflow
     assert "EXPECTED_GCP_REPOSITORY: fraeno-runner" in workflow
     assert (
         "EXPECTED_GCP_WORKLOAD_IDENTITY_PROVIDER: "
-        "projects/286435890377/locations/global/workloadIdentityPools/"
+        "projects/1001829102083/locations/global/workloadIdentityPools/"
         "fraeno-github/providers/fraeno-runner"
     ) in workflow
     assert (
         "EXPECTED_GCP_RELEASE_SERVICE_ACCOUNT: "
-        "fraeno-runner-publisher@deepubuntu-32f9e.iam.gserviceaccount.com"
+        "fraeno-runner-publisher@fraeno-prod.iam.gserviceaccount.com"
     ) in workflow
     assert 'GCP_REPOSITORY" != "$EXPECTED_GCP_REPOSITORY' in workflow
     assert (
@@ -212,7 +212,7 @@ def test_release_workflow_uses_wif_and_direct_artifact_registry() -> None:
 def test_release_docs_name_only_the_public_runner_repository() -> None:
     release_docs = (ROOT / "docs" / "releases.md").read_text()
 
-    assert "us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-runner" in release_docs
+    assert "us-central1-docker.pkg.dev/fraeno-prod/fraeno-runner" in release_docs
     assert "`us-central1`, and `fraeno-runner`" in release_docs
     assert "update fraeno-runner" in release_docs
     assert "private mixed `fraeno`" in release_docs
@@ -313,6 +313,7 @@ def test_action_comments_match_the_pinned_releases() -> None:
         "3d3c42e5aac5ba805825da76410c181273ba90b1": "v7.0.1",
         "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a": "v7.0.1",
         "ece7cb06caefa5fff74198d8649806c4678c61a1": "v6",
+        "49933ea5288caeca8642d1e84afbd3f7d6820020": "v4",
         "7c6bc770dae815cd3e89ee6cdf493a5fab2cc093": "v3",
         "aa5489c8933f4cc7a4f7d45035b3b1440c9c10db": "v3",
         "bb05f3f5519dd87d3ba754cc423b652a5edd6d2c": "v4.2.0",

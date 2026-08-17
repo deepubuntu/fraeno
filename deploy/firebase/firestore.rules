@@ -10,24 +10,6 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    match /dataset-access-requests/{document=**} {
-      allow read, write: if isAdmin();
-    }
-
-    match /faqs/{document=**} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /documentation/{document=**} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /applications/{document=**} {
-      allow read, write: if isAdmin();
-    }
-
     match /fraeno_installations/{document=**} {
       allow read: if isAdmin();
       allow write: if false;

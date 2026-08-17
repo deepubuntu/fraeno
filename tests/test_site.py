@@ -198,7 +198,7 @@ def test_admin_console_is_protected_and_uses_product_records() -> None:
     assert "https://www.gstatic.com" in headers
     assert "script-src 'self' https://apis.google.com" in headers
     assert "frame-src https://accounts.google.com" in headers
-    assert "https://deepubuntu-32f9e.firebaseapp.com" in headers
+    assert "https://fraeno-prod.firebaseapp.com" in headers
     assert "/admin/" in headers and "Cache-Control: no-store" in headers
     public_headers, admin_headers = headers.split("/admin/*", maxsplit=1)
     assert "https://www.gstatic.com" not in public_headers
@@ -232,14 +232,12 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     script = (SITE / "site.js").read_text()
     headers = (SITE / "_headers").read_text()
 
-    video_markup = (
-        "<video\n"
-        "              autoplay\n"
-        "              muted\n"
-        "              loop\n"
-        "              playsinline"
-    )
-    assert video_markup in page
+    hero_video = page.split('data-hero-visual aria-hidden="true">', 1)[1].split(
+        "</video>", 1
+    )[0]
+    assert "autoplay" in hero_video
+    assert page.count("autoplay") == 1
+    assert page.count('preload="none"') == 2
     assert 'poster="/assets/robot-system-poster.webp?v=22eddc0b"' in page
     assert 'src="/assets/robot-system-loop.mp4?v=e7e40370"' in page
     assert "data-section-video" in page

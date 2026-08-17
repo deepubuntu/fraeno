@@ -57,16 +57,16 @@ jobs:
       GCP_REPOSITORY: ${{ vars.GCP_ARTIFACT_REGISTRY_REPOSITORY }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_RELEASE_SERVICE_ACCOUNT: ${{ vars.GCP_RELEASE_SERVICE_ACCOUNT }}
-      EXPECTED_GCP_PROJECT_ID: deepubuntu-32f9e
+      EXPECTED_GCP_PROJECT_ID: fraeno-prod
       EXPECTED_GCP_LOCATION: us-central1
       EXPECTED_GCP_REPOSITORY: fraeno-control-plane
-      EXPECTED_GCP_WORKLOAD_IDENTITY_PROVIDER: projects/286435890377/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-control-plane
-      EXPECTED_GCP_RELEASE_SERVICE_ACCOUNT: fraeno-control-plane-releaser@deepubuntu-32f9e.iam.gserviceaccount.com
-      RUNNER_IMAGE: us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-runner/runner
+      EXPECTED_GCP_WORKLOAD_IDENTITY_PROVIDER: projects/1001829102083/locations/global/workloadIdentityPools/fraeno-github/providers/fraeno-control-plane
+      EXPECTED_GCP_RELEASE_SERVICE_ACCOUNT: fraeno-control-plane-releaser@fraeno-prod.iam.gserviceaccount.com
+      RUNNER_IMAGE: us-central1-docker.pkg.dev/fraeno-prod/fraeno-runner/runner
       WEBHOOK_SERVICE: fraeno-github-webhook
       WORKER_SERVICE: fraeno-github-worker
-      WEBHOOK_RUNTIME_SERVICE_ACCOUNT: fraeno-webhook@deepubuntu-32f9e.iam.gserviceaccount.com
-      WORKER_RUNTIME_SERVICE_ACCOUNT: fraeno-worker@deepubuntu-32f9e.iam.gserviceaccount.com
+      WEBHOOK_RUNTIME_SERVICE_ACCOUNT: fraeno-webhook@fraeno-prod.iam.gserviceaccount.com
+      WORKER_RUNTIME_SERVICE_ACCOUNT: fraeno-worker@fraeno-prod.iam.gserviceaccount.com
       PYTHONPATH: src
     steps:
       - name: Check out the exact reviewed commit
@@ -1217,8 +1217,8 @@ jobs:
       CONTROL_PLANE_DIGEST: ${{ needs.release.outputs.control_plane_digest }}
       RUNNER_DIGEST: ${{ needs.release.outputs.runner_digest }}
       RUNNER_RELEASE_RUN_URL: ${{ needs.release.outputs.runner_release_run_url }}
-      CONTROL_PLANE_IMAGE: us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-control-plane/control-plane
-      RUNNER_IMAGE: us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-runner/runner
+      CONTROL_PLANE_IMAGE: us-central1-docker.pkg.dev/fraeno-prod/fraeno-control-plane/control-plane
+      RUNNER_IMAGE: us-central1-docker.pkg.dev/fraeno-prod/fraeno-runner/runner
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Publish the proven release

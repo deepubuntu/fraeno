@@ -43,18 +43,18 @@ These definitions are used by the operations console at `/admin/`.
 
 ## Manual operation
 
-The admin console uses the existing Firebase administrator claim from
-DeepUbuntu Labs. Firestore rules allow administrators to read product records
+The admin console uses Fraeno's dedicated Firebase administrator claim.
+Firestore rules allow administrators to read product records
 and change only entitlement and audit records. Installation and usage records
 remain server-written.
 
 The guarded command line remains available when the browser console is not.
 
 ```bash
-fraeno-github-ops customers --project deepubuntu-32f9e
+fraeno-github-ops customers --project fraeno-prod
 
 fraeno-github-ops entitle \
-  --project deepubuntu-32f9e \
+  --project fraeno-prod \
   --installation-id 123456 \
   --status trial \
   --plan private_beta \
