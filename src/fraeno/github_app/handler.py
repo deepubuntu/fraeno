@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any
 
 from fraeno.github_app.client import GitHubApiError, GitHubClient, WorkflowRun
 from fraeno.github_app.metrics import MetricSink, NullMetricSink
 from fraeno.github_app.presentation import present_validation
-from fraeno.github_app.store import EventStore, RepositoryRecord, RunRecord
+from fraeno.github_app.store import (
+    EventStore,
+    InstallationRecord,
+    RepositoryRecord,
+    RunRecord,
+    utc_now,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -107,8 +114,16 @@ class EventHandler:
     async def _installation(self, payload: dict[str, Any]) -> None:
         action = str(payload["action"])
         installation_id = int(payload["installation"]["id"])
+        repository_objects = self._repository_objects(payload.get("repositories", []))
         if action in INACTIVE_INSTALLATION_ACTIONS:
             status = "removed" if action == "deleted" else "suspended"
+            await self._remember_installation(
+                payload,
+                status=status,
+                connected_repositories=(
+                    0 if action == "deleted" else len(repository_objects)
+                ),
+            )
             reason = (
                 "The Fraeno installation was removed"
                 if action == "deleted"
@@ -118,9 +133,7 @@ class EventHandler:
                 record.repository_id: record
                 for record in await self.store.list_repositories(installation_id)
             }
-            for repository_object in self._repository_objects(
-                payload.get("repositories", [])
-            ):
+            for repository_object in repository_objects:
                 repository_id = int(repository_object["id"])
                 known_repositories.setdefault(
                     repository_id,
@@ -138,6 +151,11 @@ class EventHandler:
             return
         if action not in ACTIVE_INSTALLATION_ACTIONS:
             return
+        await self._remember_installation(
+            payload,
+            status="installed",
+            connected_repositories=len(repository_objects),
+        )
         raw_repositories = payload.get("repositories")
         repository_objects = (
             self._repository_objects(raw_repositories)
@@ -160,6 +178,7 @@ class EventHandler:
         self, payload: dict[str, Any]
     ) -> None:
         installation_id = int(payload["installation"]["id"])
+        await self._remember_installation(payload, status="installed")
         for repository in self._repository_objects(
             payload.get("repositories_removed", [])
         ):
@@ -180,6 +199,18 @@ class EventHandler:
             payload.get("repositories_added", [])
         ):
             await self._probe_repository(installation_id, repository)
+        connected = len(
+            [
+                record
+                for record in await self.store.list_repositories(installation_id)
+                if record.status not in {"removed", "suspended"}
+            ]
+        )
+        await self._remember_installation(
+            payload,
+            status="installed",
+            connected_repositories=connected,
+        )
 
     async def _probe_repository(
         self, installation_id: int, repository: dict[str, Any]
@@ -259,6 +290,7 @@ class EventHandler:
         repository_id = int(repository["id"])
         full_name = str(repository["full_name"])
         default_branch = str(repository["default_branch"])
+        installation = await self._remember_installation(payload, status="installed")
         await self.store.upsert_repository(
             self._repository_record(
                 installation_id,
@@ -308,7 +340,16 @@ class EventHandler:
             )
         approved = self.client.settings.approved_installation_logins
         owner = full_name.split("/", 1)[0].lower()
-        if "*" not in approved and owner not in approved:
+        account_login = installation.account_login or owner
+        emergency_override = (
+            "*" in approved or owner in approved or account_login in approved
+        )
+        entitlement = (
+            None
+            if emergency_override
+            else await self.store.get_entitlement(installation_id)
+        )
+        if not emergency_override and (entitlement is None or not entitlement.permits()):
             await self.store.upsert_repository(
                 self._repository_record(
                     installation_id,
@@ -405,6 +446,12 @@ class EventHandler:
                 details_url=workflow.html_url,
                 retention_days=self.client.settings.run_retention_days,
             )
+        )
+        await self.store.record_check_started(
+            installation_id,
+            account_login,
+            utc_now(),
+            first_check_at=installation.first_check_at,
         )
         await self.client.update_check_run(
             full_name,
@@ -518,6 +565,17 @@ class EventHandler:
             (datetime.now(timezone.utc) - created_at).total_seconds(),
         )
         self.metrics.emit("run_duration_seconds", duration)
+        installation = await self.store.get_installation(record.installation_id)
+        account_login = (
+            installation.account_login
+            if installation is not None
+            else record.repository.split("/", 1)[0].lower()
+        )
+        await self.store.record_check_completed(
+            record.installation_id,
+            account_login,
+            utc_now(),
+        )
         await self.store.clear_active_run(record)
 
     async def fail_stale_run(self, record: RunRecord, *, reason: str) -> None:
@@ -609,6 +667,64 @@ class EventHandler:
             reason=reason,
             retention_days=self.client.settings.repository_retention_days,
         )
+
+    async def _remember_installation(
+        self,
+        payload: dict[str, Any],
+        *,
+        status: str,
+        connected_repositories: int | None = None,
+    ) -> InstallationRecord:
+        raw_installation = payload["installation"]
+        installation_id = int(raw_installation["id"])
+        existing = await self.store.get_installation(installation_id)
+        raw_account = raw_installation.get("account")
+        account = raw_account if isinstance(raw_account, dict) else {}
+        repository = payload.get("repository")
+        repository_owner = ""
+        if isinstance(repository, dict):
+            full_name = str(repository.get("full_name") or "")
+            repository_owner = full_name.split("/", 1)[0].lower()
+        account_login = str(account.get("login") or "").strip().lower()
+        if not account_login and existing is not None:
+            account_login = existing.account_login
+        account_login = account_login or repository_owner
+        raw_account_id = account.get("id")
+        account_id = (
+            int(raw_account_id)
+            if raw_account_id is not None
+            else existing.account_id if existing is not None else 0
+        )
+        account_type = str(account.get("type") or "").strip()
+        if not account_type and existing is not None:
+            account_type = existing.account_type
+        account_type = account_type or "Unknown"
+        now = utc_now()
+        if existing is None:
+            record = InstallationRecord.create(
+                installation_id=installation_id,
+                account_id=account_id,
+                account_login=account_login,
+                account_type=account_type,
+                status=status,
+                connected_repositories=connected_repositories or 0,
+            )
+        else:
+            record = replace(
+                existing,
+                account_id=account_id,
+                account_login=account_login,
+                account_type=account_type,
+                status=status,
+                connected_repositories=(
+                    existing.connected_repositories
+                    if connected_repositories is None
+                    else max(connected_repositories, 0)
+                ),
+                updated_at=now,
+            )
+        await self.store.upsert_installation(record)
+        return record
 
     @staticmethod
     def _repository_objects(raw_value: Any) -> list[dict[str, Any]]:

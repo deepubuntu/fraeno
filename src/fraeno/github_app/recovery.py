@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta, timezone
 
 from fraeno.github_app.client import GitHubApiError, GitHubClient
 from fraeno.github_app.handler import EventHandler
 from fraeno.github_app.metrics import MetricSink, NullMetricSink
 from fraeno.github_app.settings import AppSettings
-from fraeno.github_app.store import EventStore
+from fraeno.github_app.store import EventStore, InstallationRecord
 
 
 @dataclass(frozen=True)
 class ReconciliationResult:
+    installations_seen: int = 0
+    installations_synced: int = 0
     deliveries_dead_lettered: int = 0
     checks_seen: int = 0
     checks_completed: int = 0
@@ -38,13 +40,22 @@ class Reconciler:
         self.settings = settings
         self.metrics = metrics or NullMetricSink()
 
-    async def reconcile(
-        self, *, now: datetime | None = None
-    ) -> ReconciliationResult:
+    async def reconcile(self, *, now: datetime | None = None) -> ReconciliationResult:
         active_now = now or datetime.now(timezone.utc)
+        installations_seen = 0
+        installations_synced = 0
+        github_errors = 0
+        try:
+            installations = await self.client.app_installations()
+            installations_seen = len(installations)
+            for installation in installations:
+                if await self._sync_installation(installation, active_now):
+                    installations_synced += 1
+        except GitHubApiError:
+            github_errors += 1
+
         stale_deliveries = await self.store.list_stale_deliveries(
-            active_now
-            - timedelta(seconds=self.settings.delivery_stale_seconds)
+            active_now - timedelta(seconds=self.settings.delivery_stale_seconds)
         )
         for delivery in stale_deliveries:
             await self.store.dead_letter_delivery(
@@ -58,7 +69,6 @@ class Reconciler:
         completed = 0
         failed = 0
         pending = 0
-        github_errors = 0
         for record in stale_runs:
             self.metrics.emit("stale_check")
             try:
@@ -101,10 +111,78 @@ class Reconciler:
                 failed += 1
 
         return ReconciliationResult(
+            installations_seen=installations_seen,
+            installations_synced=installations_synced,
             deliveries_dead_lettered=len(stale_deliveries),
             checks_seen=len(stale_runs),
             checks_completed=completed,
             checks_failed=failed,
             checks_pending=pending,
             github_errors=github_errors,
+        )
+
+    async def _sync_installation(
+        self,
+        raw_installation: dict[str, object],
+        observed_at: datetime,
+    ) -> bool:
+        try:
+            raw_installation_id = raw_installation["id"]
+            if not isinstance(raw_installation_id, (int, str)) or isinstance(
+                raw_installation_id, bool
+            ):
+                return False
+            installation_id = int(raw_installation_id)
+            raw_account = raw_installation["account"]
+            if not isinstance(raw_account, dict):
+                return False
+            account_id = int(raw_account["id"])
+            account_login = str(raw_account["login"]).strip().lower()
+            account_type = str(raw_account.get("type") or "Unknown")
+        except (KeyError, TypeError, ValueError):
+            return False
+        if not account_login:
+            return False
+
+        current = await self.store.get_installation(installation_id)
+        status = "suspended" if raw_installation.get("suspended_at") is not None else "installed"
+        if current is None:
+            record = InstallationRecord.create(
+                installation_id=installation_id,
+                account_id=account_id,
+                account_login=account_login,
+                account_type=account_type,
+                status=status,
+            )
+            created_at = self._github_timestamp(raw_installation.get("created_at"))
+            if created_at is not None:
+                record = replace(
+                    record,
+                    installed_at=created_at,
+                    updated_at=observed_at,
+                )
+        else:
+            record = replace(
+                current,
+                account_id=account_id,
+                account_login=account_login,
+                account_type=account_type,
+                status=status,
+                updated_at=observed_at,
+            )
+        await self.store.upsert_installation(record)
+        return True
+
+    @staticmethod
+    def _github_timestamp(raw_value: object) -> datetime | None:
+        if not isinstance(raw_value, str) or not raw_value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return (
+            parsed.replace(tzinfo=timezone.utc)
+            if parsed.tzinfo is None
+            else parsed.astimezone(timezone.utc)
         )

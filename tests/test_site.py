@@ -166,6 +166,39 @@ def test_site_submits_access_requests_through_the_contact_worker() -> None:
     assert "Fraeno access request from" not in worker_source
 
 
+def test_admin_console_is_protected_and_uses_product_records() -> None:
+    page = (SITE / "admin" / "index.html").read_text()
+    script = (SITE / "admin" / "admin.js").read_text()
+    styles = (SITE / "admin" / "admin.css").read_text()
+    headers = (SITE / "_headers").read_text()
+    rules = (ROOT / "deploy" / "firebase" / "firestore.rules").read_text()
+
+    assert "Fraeno operations" in page
+    assert 'type="password"' in page
+    assert "Paid customers" in script
+    assert "fraeno_installations" in script
+    assert "fraeno_entitlements" in script
+    assert "fraeno_usage" in script
+    assert 'fetch("/api/admin/leads"' in script
+    assert "token.claims.isAdmin !== true" in script
+    assert "--green: #8db61f" in styles
+    assert "https://www.gstatic.com" in headers
+    assert "/admin/" in headers and "Cache-Control: no-store" in headers
+    assert "match /fraeno_installations" in rules
+    assert "match /fraeno_usage" in rules
+    assert "match /fraeno_entitlements" in rules
+    assert "allow read, write: if isAdmin();" in rules
+
+
+def test_privacy_notice_explains_installation_and_usage_metadata() -> None:
+    privacy = (SITE / "privacy.html").read_text()
+
+    assert "Fraeno installations" in privacy
+    assert "installation ID" in privacy
+    assert "basic check activity" in privacy
+    assert "do not store repository" in privacy
+
+
 def test_site_uses_product_motion_without_decorative_media() -> None:
     page = (SITE / "index.html").read_text()
     script = (SITE / "site.js").read_text()

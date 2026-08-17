@@ -3,6 +3,10 @@ const FROM_ADDRESS = "contact@fraeno.com";
 const ALLOWED_ORIGINS = new Set(["https://fraeno.com", "https://www.fraeno.com"]);
 const MAX_BODY_BYTES = 8192;
 const MINIMUM_DWELL_MS = 3000;
+const MAX_ADMIN_LEADS = 1000;
+const FIREBASE_JWKS_URL =
+  "https://www.googleapis.com/service_accounts/v1/jwk/" +
+  "securetoken@system.gserviceaccount.com";
 
 const FIELD_LIMITS = {
   name: { min: 1, max: 120 },
@@ -18,6 +22,146 @@ function reject(status, reason) {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function jsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+function decodeBase64Url(value) {
+  const padded = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(
+    Math.ceil(value.length / 4) * 4,
+    "="
+  );
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function jwtObject(value) {
+  const decoded = new TextDecoder().decode(decodeBase64Url(value));
+  const parsed = JSON.parse(decoded);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("JWT section is not an object");
+  }
+  return parsed;
+}
+
+async function verifyFirebaseAdminToken(token, env) {
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    return false;
+  }
+  let header;
+  let payload;
+  try {
+    header = jwtObject(parts[0]);
+    payload = jwtObject(parts[1]);
+  } catch {
+    return false;
+  }
+  if (
+    header.alg !== "RS256" ||
+    typeof header.kid !== "string" ||
+    !header.kid ||
+    typeof env.FIREBASE_PROJECT_ID !== "string" ||
+    !env.FIREBASE_PROJECT_ID
+  ) {
+    return false;
+  }
+  let jwks;
+  try {
+    const response = await fetch(FIREBASE_JWKS_URL, {
+      cf: { cacheEverything: true, cacheTtl: 3600 },
+    });
+    if (!response.ok) {
+      return false;
+    }
+    jwks = await response.json();
+  } catch {
+    return false;
+  }
+  const keys = Array.isArray(jwks.keys) ? jwks.keys : [];
+  const jwk = keys.find((candidate) => candidate.kid === header.kid);
+  if (!jwk) {
+    return false;
+  }
+  let verified = false;
+  try {
+    const key = await crypto.subtle.importKey(
+      "jwk",
+      jwk,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    verified = await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5",
+      key,
+      decodeBase64Url(parts[2]),
+      new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
+    );
+  } catch {
+    return false;
+  }
+  const now = Math.floor(Date.now() / 1000);
+  return (
+    verified &&
+    payload.aud === env.FIREBASE_PROJECT_ID &&
+    payload.iss === `https://securetoken.google.com/${env.FIREBASE_PROJECT_ID}` &&
+    typeof payload.sub === "string" &&
+    payload.sub.length > 0 &&
+    payload.sub.length <= 128 &&
+    typeof payload.exp === "number" &&
+    payload.exp > now &&
+    typeof payload.iat === "number" &&
+    payload.iat <= now + 300 &&
+    typeof payload.auth_time === "number" &&
+    payload.auth_time <= now + 300 &&
+    payload.isAdmin === true
+  );
+}
+
+async function handleAdminLeads(request, env) {
+  const authorization = request.headers.get("Authorization") || "";
+  const token = authorization.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : "";
+  if (!token || !(await verifyFirebaseAdminToken(token, env))) {
+    return reject(401, "admin authentication is required");
+  }
+  const leads = [];
+  let cursor;
+  do {
+    const result = await env.CONTACTS.list({
+      limit: Math.min(1000, MAX_ADMIN_LEADS - leads.length),
+      ...(cursor ? { cursor } : {}),
+    });
+    const records = await Promise.all(
+      result.keys.map((item) => env.CONTACTS.get(item.name, "json"))
+    );
+    records.forEach((record) => {
+      if (record && leads.length < MAX_ADMIN_LEADS) {
+        leads.push({
+          name: record.name || "",
+          email: record.email || "",
+          company: record.company || "",
+          last_message: record.last_message || "",
+          updates: record.updates === true,
+          first_seen: record.first_seen || "",
+          last_seen: record.last_seen || "",
+          submissions: Number(record.submissions || 0),
+        });
+      }
+    });
+    cursor = result.list_complete ? undefined : result.cursor;
+  } while (cursor && leads.length < MAX_ADMIN_LEADS);
+  return jsonResponse({ ok: true, leads });
 }
 
 const EMAIL_FONT =
@@ -148,6 +292,26 @@ async function handleUnsubscribe(request, env) {
 export default {
   async fetch(request, env) {
     const pathname = new URL(request.url).pathname;
+    if (pathname === "/api/admin/config") {
+      if (request.method !== "GET") {
+        return reject(405, "only GET is accepted");
+      }
+      if (!env.FIREBASE_API_KEY || !env.FIREBASE_PROJECT_ID) {
+        return reject(503, "admin authentication is not configured");
+      }
+      return jsonResponse({
+        apiKey: env.FIREBASE_API_KEY,
+        authDomain:
+          env.FIREBASE_AUTH_DOMAIN || `${env.FIREBASE_PROJECT_ID}.firebaseapp.com`,
+        projectId: env.FIREBASE_PROJECT_ID,
+      });
+    }
+    if (pathname === "/api/admin/leads") {
+      if (request.method !== "GET") {
+        return reject(405, "only GET is accepted");
+      }
+      return handleAdminLeads(request, env);
+    }
     if (pathname === "/api/unsubscribe") {
       if (request.method !== "GET" && request.method !== "POST") {
         return reject(405, "only GET and POST are accepted");
@@ -278,7 +442,12 @@ export default {
         ),
       });
     } catch (error) {
-      console.log(`confirmation send failed: ${error}`);
+      console.error(
+        JSON.stringify({
+          message: "confirmation send failed",
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
     }
 
     return new Response(JSON.stringify({ ok: true }), {

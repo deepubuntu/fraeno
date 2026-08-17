@@ -24,6 +24,44 @@ def client_with(handler: httpx.MockTransport) -> GitHubClient:
 
 
 @pytest.mark.anyio
+async def test_app_installations_are_loaded_across_pages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "fraeno.github_app.client.create_app_jwt",
+        lambda app_id, private_key: f"jwt-{app_id}-{private_key}",
+    )
+    pages: list[str] = []
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        pages.append(request.url.params["page"])
+        values = (
+            [
+                {
+                    "id": index,
+                    "account": {"id": index, "login": f"org-{index}"},
+                }
+                for index in range(100)
+            ]
+            if request.url.params["page"] == "1"
+            else [
+                {
+                    "id": 101,
+                    "account": {"id": 101, "login": "last-org"},
+                }
+            ]
+        )
+        return httpx.Response(200, json=values)
+
+    client = client_with(httpx.MockTransport(respond))
+    installations = await client.app_installations()
+    await client.close()
+
+    assert len(installations) == 101
+    assert pages == ["1", "2"]
+
+
+@pytest.mark.anyio
 async def test_workflow_dispatch_correlates_the_run_after_an_empty_response() -> None:
     listed = 0
 

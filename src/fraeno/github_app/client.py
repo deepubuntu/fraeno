@@ -98,6 +98,22 @@ class GitHubClient:
             raise GitHubApiError("GitHub did not return an installation token")
         return token
 
+    async def app_installations(self) -> list[dict[str, Any]]:
+        installations: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            response = await self._app_list_request(
+                "GET",
+                "/app/installations",
+                params={"per_page": "100", "page": str(page)},
+            )
+            installations.extend(
+                value for value in response if isinstance(value, dict)
+            )
+            if len(response) < 100:
+                return installations
+            page += 1
+
     async def create_check_run(
         self,
         repository: str,
@@ -356,6 +372,40 @@ class GitHubClient:
             allowed_statuses=allowed_statuses,
         )
 
+    async def _app_list_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, str] | None = None,
+    ) -> list[Any]:
+        try:
+            return await self._request_list(
+                method,
+                path,
+                token=create_app_jwt(
+                    self.settings.app_id, self.settings.private_key
+                ),
+                params=params,
+            )
+        except GitHubApiError as error:
+            if (
+                error.status_code != 401
+                or not self.settings.previous_private_key
+                or self.settings.credential_rotation is None
+                or not self.settings.credential_rotation.accepts_previous()
+            ):
+                raise
+        LOGGER.warning("GitHub App authentication used the previous key")
+        return await self._request_list(
+            method,
+            path,
+            token=create_app_jwt(
+                self.settings.app_id, self.settings.previous_private_key
+            ),
+            params=params,
+        )
+
     async def pull_request(
         self,
         repository: str,
@@ -539,6 +589,46 @@ class GitHubClient:
             return {}
         data = response.json()
         if not isinstance(data, dict):
+            raise GitHubApiError("GitHub API returned an unexpected response")
+        return data
+
+    async def _request_list(
+        self,
+        method: str,
+        path: str,
+        *,
+        token: str,
+        params: dict[str, str] | None = None,
+    ) -> list[Any]:
+        try:
+            response = await self._client.request(
+                method,
+                path,
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "Authorization": f"Bearer {token}",
+                    "X-GitHub-Api-Version": self.settings.github_api_version,
+                    "User-Agent": "fraeno-github-app",
+                },
+                params=params,
+            )
+        except httpx.RequestError as error:
+            raise GitHubApiError(
+                "GitHub API request failed before a response",
+                retryable=True,
+            ) from error
+        if response.is_error:
+            request_id = response.headers.get("x-github-request-id", "unknown")
+            raise GitHubApiError(
+                f"GitHub API returned {response.status_code}; request id {request_id}",
+                retryable=(
+                    response.status_code in {408, 429}
+                    or response.status_code >= 500
+                ),
+                status_code=response.status_code,
+            )
+        data = response.json()
+        if not isinstance(data, list):
             raise GitHubApiError("GitHub API returned an unexpected response")
         return data
 

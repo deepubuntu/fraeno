@@ -11,6 +11,33 @@ const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString(
 )}`;
 const worker = (await import(moduleUrl)).default;
 
+function base64url(value) {
+  return Buffer.from(value).toString("base64url");
+}
+
+async function adminToken(privateKey, keyId, overrides = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg: "RS256", kid: keyId }));
+  const payload = base64url(
+    JSON.stringify({
+      aud: "deepubuntu-32f9e",
+      iss: "https://securetoken.google.com/deepubuntu-32f9e",
+      sub: "admin-user",
+      exp: now + 3600,
+      iat: now,
+      auth_time: now,
+      isAdmin: true,
+      ...overrides,
+    })
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    privateKey,
+    new TextEncoder().encode(`${header}.${payload}`)
+  );
+  return `${header}.${payload}.${Buffer.from(signature).toString("base64url")}`;
+}
+
 test("an access request sends only the customer confirmation", async () => {
   const records = new Map();
   const messages = [];
@@ -66,4 +93,105 @@ test("an access request sends only the customer confirmation", async () => {
   assert.equal(stored.name, "Kelvin");
   assert.equal(stored.submissions, 1);
   assert.equal(stored.updates, true);
+});
+
+test("admin configuration exposes only the public Firebase client settings", async () => {
+  const response = await worker.fetch(
+    new Request("https://fraeno.com/api/admin/config"),
+    {
+      FIREBASE_API_KEY: "public-browser-key",
+      FIREBASE_PROJECT_ID: "deepubuntu-32f9e",
+      FIREBASE_AUTH_DOMAIN: "deepubuntu-32f9e.firebaseapp.com",
+    }
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    apiKey: "public-browser-key",
+    authDomain: "deepubuntu-32f9e.firebaseapp.com",
+    projectId: "deepubuntu-32f9e",
+  });
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
+});
+
+test("only a valid Firebase admin token can read access requests", async () => {
+  const keys = await crypto.subtle.generateKey(
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256",
+    },
+    true,
+    ["sign", "verify"]
+  );
+  const keyId = "test-key";
+  const publicJwk = await crypto.subtle.exportKey("jwk", keys.publicKey);
+  publicJwk.kid = keyId;
+  publicJwk.alg = "RS256";
+  publicJwk.use = "sig";
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ keys: [publicJwk] }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  const records = new Map([
+    [
+      "kelvin@example.com",
+      JSON.stringify({
+        name: "Kelvin",
+        email: "kelvin@example.com",
+        company: "NVIDIA",
+        last_seen: "2026-08-17T07:40:00.000Z",
+        unsubscribe_token: "private-token",
+      }),
+    ],
+  ]);
+  const env = {
+    FIREBASE_PROJECT_ID: "deepubuntu-32f9e",
+    CONTACTS: {
+      async list() {
+        return {
+          keys: [...records.keys()].map((name) => ({ name })),
+          list_complete: true,
+        };
+      },
+      async get(key, type) {
+        const value = records.get(key);
+        return type === "json" && value ? JSON.parse(value) : value || null;
+      },
+    },
+  };
+
+  try {
+    const missing = await worker.fetch(
+      new Request("https://fraeno.com/api/admin/leads"),
+      env
+    );
+    assert.equal(missing.status, 401);
+
+    const nonAdmin = await adminToken(keys.privateKey, keyId, { isAdmin: false });
+    const denied = await worker.fetch(
+      new Request("https://fraeno.com/api/admin/leads", {
+        headers: { Authorization: `Bearer ${nonAdmin}` },
+      }),
+      env
+    );
+    assert.equal(denied.status, 401);
+
+    const token = await adminToken(keys.privateKey, keyId);
+    const accepted = await worker.fetch(
+      new Request("https://fraeno.com/api/admin/leads", {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
+    assert.equal(accepted.status, 200);
+    const payload = await accepted.json();
+    assert.equal(payload.leads.length, 1);
+    assert.equal(payload.leads[0].email, "kelvin@example.com");
+    assert.equal(payload.leads[0].unsubscribe_token, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
