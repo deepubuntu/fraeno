@@ -40,5 +40,8 @@ blocks the pull request.
 The check protects only the behaviors declared in `.fraeno.yml`. It does not
 claim to prove every possible physical behavior safe.
 
+See a real [safe external trial pass](https://github.com/Thabhelo/fraeno-demo-trial/actions/runs/32513196936)
+and a [dangerous external update blocked](https://github.com/Thabhelo/fraeno-demo-trial/actions/runs/32513414015).
+
 When you are ready to connect a real robot project, continue with the
 [complete onboarding guide](onboarding.md).
