@@ -42,7 +42,7 @@ Install the current public release in a virtual environment:
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install \
-  "git+https://github.com/deepubuntu/fraeno.git@v0.2.3"
+  "git+https://github.com/deepubuntu/fraeno.git@v0.2.4"
 ```
 
 From the robot repository, run:
@@ -55,7 +55,7 @@ fraeno init . \
   --required-node /controller \
   --required-topic /robot/command \
   --rate-topic /robot/command \
-  --runner-image "us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-runner/runner@sha256:8f932a56209a0a8ecfbda3fff9958fd9b710d1d0065a9312486e9acd674fdcfc" \
+  --runner-image "us-central1-docker.pkg.dev/fraeno-prod/fraeno-runner/runner@sha256:399a573b5b81d8baf3570f491c7958cc15b4ffeecadd760c0906ef8d7825c8d9" \
   --open-pr
 ```
 
