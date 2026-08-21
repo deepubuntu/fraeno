@@ -6,29 +6,43 @@ anything that already exists.
 
 ## Before you start
 
-The supported targets are ROS 2 Humble on Ubuntu 22.04 with the `amd64` or
-`arm64` architecture. The `arm64` target covers boards such as NVIDIA Jetson
-and Raspberry Pi. `fraeno init` writes `amd64` by default; set
-`target.architecture` to `arm64` in `.fraeno.yml` for an arm64 robot. Any
-other architecture is refused.
+The supported private-beta target is ROS 2 Humble on Ubuntu 22.04 with the
+`amd64` architecture. Other architectures are not part of the current support
+promise.
 
 You need:
 
 - a Git repository hosted on GitHub
+- the GitHub CLI authenticated for that repository
 - Docker running locally
 - a built ROS 2 workspace
 - the command that launches the complete system
-- the published Fraeno runner image with its full `@sha256` digest
+- approval for the Fraeno private beta
 
 Do not launch a physical robot unless the work area and emergency stop are
 ready. The normal doctor check does not launch it.
 
+If you do not have a robot repository, stop here and follow the
+[demo-robot guide](try-demo.md). It runs entirely in GitHub Actions.
+
+## Request private-beta access
+
+1. [Request access](https://fraeno.com/#access) with the GitHub username that
+   owns the robot repository.
+2. [Install the Fraeno GitHub App](https://github.com/apps/fraeno-robotics) on
+   only the repository you want Fraeno to check.
+3. Wait for the installation to be approved. Before approval, pull requests
+   receive a neutral **Fraeno is in private beta** check.
+
 ## Create the onboarding pull request
 
-Install Fraeno from its checked-out source while the CLI is private:
+Install the current public release in a virtual environment:
 
 ```bash
-python3 -m pip install /path/to/fraeno
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install \
+  "git+https://github.com/deepubuntu/fraeno.git@v0.2.3"
 ```
 
 From the robot repository, run:
@@ -41,7 +55,7 @@ fraeno init . \
   --required-node /controller \
   --required-topic /robot/command \
   --rate-topic /robot/command \
-  --runner-image "REGISTRY/runner@sha256:FULL_DIGEST" \
+  --runner-image "us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-runner/runner@sha256:8f932a56209a0a8ecfbda3fff9958fd9b710d1d0065a9312486e9acd674fdcfc" \
   --open-pr
 ```
 
@@ -62,10 +76,9 @@ Review the launch command, required graph entities, topic rates, and target.
 Merge the onboarding pull request only when the contract describes the real
 system.
 
-## Install the GitHub App
+## GitHub App permissions
 
-Install [Fraeno](https://github.com/apps/fraeno-robotics) on only the robot
-repository. The App needs:
+The App needs:
 
 - Actions read and write
 - Checks read and write

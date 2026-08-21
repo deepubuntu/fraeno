@@ -97,6 +97,11 @@
       <nav id="primary-navigation" aria-label="Primary navigation" data-navigation>
         <a href="#why">Why it matters</a>
         <a href="#action">Fraeno in action</a>
+        <a
+          href="https://github.com/deepubuntu/fraeno-demo-robot"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Try the demo</a>
         <button class="nav-action" type="button" data-contact-open>
           Request access
         </button>
@@ -241,7 +246,7 @@
                   <strong>Real robot protected</strong>
                 </div>
                 <a
-                  href="https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/30368351839"
+                  href="https://github.com/deepubuntu/fraeno-demo-robot/actions/runs/30368351839"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -328,14 +333,25 @@
         </small>
       </section>
 
-      <section class="closing">
+      <section class="closing" id="access">
         <div class="closing-inner section-shell" data-reveal>
           <p>Fraeno</p>
           <h2>Protect the robot from dangerous software updates.</h2>
-          <button class="install-link" type="button" data-contact-open>
-            Request access
-            <span aria-hidden="true">→</span>
-          </button>
+          <div class="closing-actions">
+            <button class="install-link" type="button" data-contact-open>
+              Request access
+              <span aria-hidden="true">→</span>
+            </button>
+            <a
+              class="install-link is-secondary"
+              href="https://github.com/deepubuntu/fraeno-demo-robot"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Try the demo robot
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
         </div>
       </section>
     </main>
@@ -370,6 +386,11 @@
           </div>
           <div>
             <span>Get started</span>
+            <a
+              href="https://github.com/deepubuntu/fraeno-demo-robot"
+              target="_blank"
+              rel="noopener noreferrer"
+            >Try the demo</a>
             <button type="button" data-contact-open>Request access</button>
             <a href="/privacy.html">Privacy</a>
           </div>
@@ -412,6 +433,18 @@
           <label>
             Work email
             <input type="email" name="email" required maxlength="254" autocomplete="email" />
+          </label>
+          <label>
+            GitHub username
+            <input
+              type="text"
+              name="github"
+              required
+              maxlength="39"
+              autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+            />
           </label>
           <label>
             Company

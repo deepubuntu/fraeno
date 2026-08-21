@@ -28,10 +28,17 @@ test("opens and closes the access request dialog", async ({ page }) => {
   await page.getByRole("button", { name: "Request access" }).first().click();
   const dialog = page.getByRole("dialog", { name: "Request access" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByLabel("Name")).toBeFocused();
+  await expect(dialog.getByLabel("Name", { exact: true })).toBeFocused();
 
   await page.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toBeHidden();
+});
+
+test("opens the access request directly from the private beta link", async ({ page }) => {
+  await page.goto("/#access", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("dialog", { name: "Request access" })).toBeVisible();
+  await expect(page.getByLabel("GitHub username")).toBeVisible();
 });
 
 test("shows the complete protected admin sign-in surface", async ({ page }) => {

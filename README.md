@@ -26,12 +26,27 @@ Fraeno reports the achieved validation level:
 
 The first release targets `L2`.
 
-## Quick start
+## Try Fraeno
 
-Install the local engine:
+No robot repository yet? Use the
+[public demo robot](https://github.com/deepubuntu/fraeno-demo-robot) to watch a
+safe update pass and a dangerous update get blocked. The
+[ten-minute demo guide](docs/try-demo.md) requires no robot hardware.
+
+To connect your own ROS 2 repository, request private-beta access at
+[fraeno.com](https://fraeno.com/#access), then follow the
+[complete onboarding guide](docs/onboarding.md).
+
+The source and demo are public. Access to the hosted GitHub App remains private
+while early teams are onboarded directly.
+
+## Quick start for your repository
+
+Install the current release:
 
 ```bash
-python3 -m pip install .
+python3 -m pip install \
+  "git+https://github.com/deepubuntu/fraeno.git@v0.2.3"
 ```
 
 Add Fraeno to a ROS 2 repository:
@@ -39,7 +54,7 @@ Add Fraeno to a ROS 2 repository:
 ```bash
 fraeno init . \
   --launch-command "ros2 launch my_robot_bringup system.launch.py" \
-  --runner-image "REGISTRY/runner@sha256:FULL_DIGEST" \
+  --runner-image "us-central1-docker.pkg.dev/deepubuntu-32f9e/fraeno-runner/runner@sha256:8f932a56209a0a8ecfbda3fff9958fd9b710d1d0065a9312486e9acd674fdcfc" \
   --open-pr
 ```
 
