@@ -83,7 +83,7 @@ jobs:
 
       - name: Test the exact release commit
         run: |
-          python -m pip install ".[dev,app]"
+          python -m pip install ".[dev]"
           pytest --cov=fraeno --cov-report=term-missing
           ruff check .
           mypy --strict src

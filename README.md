@@ -40,6 +40,11 @@ To connect your own ROS 2 repository, request private-beta access at
 The source and demo are public. Access to the hosted GitHub App remains private
 while early teams are onboarded directly.
 
+This repository contains only the code customers need to inspect and run: the
+CLI, validation engine, configuration format, templates, documentation, demo
+fixtures, and runner. Hosted operations, billing, administration, and service
+credentials are kept in a separate private system.
+
 ## Quick start for your repository
 
 Install the current release:
@@ -178,11 +183,11 @@ endpoint QoS, message rates, services, and diagnostics through `rclpy`.
 The same proof runs in GitHub Actions on every Fraeno pull request. This is the
 first behavior ordinary dependency bots do not test.
 
-## GitHub App
+## Hosted GitHub App
 
-The app receives signed GitHub webhooks, durably queues each delivery, creates
-`Fraeno / robot integration` checks, dispatches the trusted validation workflow,
-and completes each check from the correlated workflow result.
+The App starts the trusted workflow and reports the result as
+`Fraeno / robot integration`. Robot code runs in the repository's GitHub
+Actions job, not inside Fraeno's hosted service.
 
 Required repository permissions:
 
@@ -191,7 +196,9 @@ Required repository permissions:
 - Contents: read
 - Pull requests: read
 
-Automated update pull requests use the repository’s trusted scheduled workflow with narrowly scoped `contents: write` and `pull-requests: write` permissions. The GitHub App private key and webhook secret never enter customer test jobs.
+Automated update pull requests use the repository's trusted scheduled workflow
+with narrowly scoped `contents: write` and `pull-requests: write` permissions.
+Hosted credentials never enter customer test jobs.
 
 ## Update discovery
 

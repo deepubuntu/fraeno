@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fraeno"
-version = "0.2.3"
+version = "0.2.4"
 description = "Robot dependency updates with complete-system integration testing."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,14 +18,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-app = [
-  "cryptography>=43,<47",
-  "fastapi>=0.115,<1",
-  "google-cloud-firestore>=2.19,<3",
-  "google-cloud-tasks>=2.19,<3",
-  "PyJWT>=2.9,<3",
-  "uvicorn[standard]>=0.32,<1",
-]
 dev = [
   "mypy>=1.13,<2",
   "pytest>=8.3,<10",
@@ -37,7 +29,6 @@ dev = [
 [project.scripts]
 fraeno = "fraeno.cli:main"
 fraeno-fixture-observe = "fraeno.fixture_observer:main"
-fraeno-github-ops = "fraeno.github_app.operations:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fraeno"]
