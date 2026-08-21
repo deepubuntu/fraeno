@@ -113,7 +113,7 @@ def test_site_shows_verified_proof_without_overclaiming() -> None:
     assert "Blocked the update" in page
     proof_footer = page.split('class="proof-footer"', 1)[1].split("</a>", 1)[0]
     assert (
-        'href="https://github.com/deepubuntu/fraeno-demo-robot/actions/runs/'
+        'href="https://github.com/Thabhelo/fraeno-demo-trial/actions/runs/'
         in proof_footer
     )
     assert 'rel="noopener noreferrer"' in proof_footer
