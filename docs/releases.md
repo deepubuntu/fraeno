@@ -138,6 +138,12 @@ repository. Public runner releases remain independent and reproducible here.
 
 ## Release history
 
+- `0.2.4` keeps the CLI, validation engine, configuration, templates,
+  documentation, demo fixtures, and isolated runner public. Hosted operations,
+  billing, administration, and service credentials now live in a separate
+  private control-plane repository. The runner is published from commit
+  `cc0fb75272b85d94e8200026e72ffe8a008b0482` at digest
+  `sha256:399a573b5b81d8baf3570f491c7958cc15b4ffeecadd760c0906ef8d7825c8d9`.
 - `0.2.0` — first published runner: multi-architecture manifest list
   (`linux/amd64`, `linux/arm64`) from the digest-pinned ROS 2 Humble base,
   released alongside GHCR digest resolution, live rosdep discovery, and
