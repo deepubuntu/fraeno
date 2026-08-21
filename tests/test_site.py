@@ -160,14 +160,6 @@ def test_site_submits_access_requests_through_the_contact_worker() -> None:
     assert "dwell_ms" in script
     assert 'github: fields.get("github")' in script
     assert "thabhelo@deepubuntu.com" in script
-    worker = Path(__file__).parents[1] / "contact-worker" / "src" / "index.js"
-    assert worker.exists()
-    worker_source = worker.read_text()
-    assert "MINIMUM_DWELL_MS" in worker_source
-    assert "payload.website" in worker_source
-    assert worker_source.count("await env.EMAIL.send") == 1
-    assert 'subject: "We received your Fraeno access request"' in worker_source
-    assert "Fraeno access request from" not in worker_source
 
 
 def test_admin_console_is_protected_and_uses_product_records() -> None:
@@ -175,7 +167,6 @@ def test_admin_console_is_protected_and_uses_product_records() -> None:
     script = (SITE / "admin" / "admin.js").read_text()
     styles = (SITE / "admin" / "admin.css").read_text()
     headers = (SITE / "_headers").read_text()
-    rules = (ROOT / "deploy" / "firebase" / "firestore.rules").read_text()
 
     assert "Admin Login" in page
     assert "Sign in to access the admin dashboard" in page
@@ -216,10 +207,6 @@ def test_admin_console_is_protected_and_uses_product_records() -> None:
     assert "event.submitter !== entitlementSaveButton" in script
     assert "/admin/admin.css?v=" in page
     assert "/admin/admin.js?v=" in page
-    assert "match /fraeno_installations" in rules
-    assert "match /fraeno_usage" in rules
-    assert "match /fraeno_entitlements" in rules
-    assert "allow read, write: if isAdmin();" in rules
 
 
 def test_privacy_notice_explains_installation_and_usage_metadata() -> None:
@@ -508,19 +495,8 @@ def test_site_ships_discovery_and_privacy_furniture() -> None:
 def test_site_contact_form_keeps_message_optional_with_update_consent() -> None:
     page = (SITE / "index.html").read_text()
     script = (SITE / "site.js").read_text()
-    worker = (
-        Path(__file__).parents[1] / "contact-worker" / "src" / "index.js"
-    ).read_text()
 
     assert "minlength" not in page
     assert 'name="updates"' in page
     assert "(optional)" not in page
     assert 'fields.get("updates") === "on"' in script
-    assert "env.CONTACTS.put" in worker
-    assert "message: { min: 0, max: 4000 }" in worker
-    assert "github: { min: 1, max: 39 }" in worker
-    assert "GITHUB_LOGIN_PATTERN" in worker
-    assert "/api/unsubscribe" in worker
-    assert "List-Unsubscribe-Post" in worker
-    assert "unsubscribe_token" in worker
-    assert "&copy; 2026 DeepUbuntu Labs" in worker

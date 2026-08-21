@@ -11,7 +11,7 @@ RUN python -m pip install --target /runtime .
 
 FROM ros:humble-ros-base-jammy@sha256:afb40d6be65331c20a114d4e229a7ef099fed1b17bf6370daee193514b32aa16
 
-ARG FRAENO_VERSION=0.2.3
+ARG FRAENO_VERSION=0.2.4
 ARG FRAENO_REVISION=unknown
 LABEL org.opencontainers.image.title="Fraeno runner" \
       org.opencontainers.image.description="Isolated robot integration validation runner" \

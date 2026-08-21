@@ -1,5 +1,0 @@
-title: Fraeno control plane operation viewer
-description: Read Cloud Run operation completion for a Fraeno release
-stage: GA
-includedPermissions:
-  - run.operations.get

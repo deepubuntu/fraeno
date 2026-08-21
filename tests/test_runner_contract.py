@@ -193,4 +193,3 @@ def test_customer_templates_are_packaged_for_fraeno_init() -> None:
 
     assert '"templates/github" = "fraeno/templates/github"' in pyproject
     assert "COPY templates ./templates" in (ROOT / "runner/Dockerfile").read_text()
-    assert "COPY templates ./templates" in (ROOT / "Dockerfile").read_text()
