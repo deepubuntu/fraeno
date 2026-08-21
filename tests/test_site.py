@@ -113,7 +113,7 @@ def test_site_shows_verified_proof_without_overclaiming() -> None:
     assert "Blocked the update" in page
     proof_footer = page.split('class="proof-footer"', 1)[1].split("</a>", 1)[0]
     assert (
-        'href="https://github.com/deepubuntu/fraeno-onboarding-smoke/actions/runs/'
+        'href="https://github.com/deepubuntu/fraeno-demo-robot/actions/runs/'
         in proof_footer
     )
     assert 'rel="noopener noreferrer"' in proof_footer
@@ -133,7 +133,7 @@ def test_site_never_links_to_private_github_resources() -> None:
 
     assert "github.com/apps/" not in page
     for target in parser.links:
-        if "fraeno-onboarding-smoke" in target:
+        if "fraeno-demo-robot" in target:
             continue
         assert "github.com/deepubuntu" not in target, target
         assert "github.com/apps/fraeno" not in target, target
@@ -141,6 +141,8 @@ def test_site_never_links_to_private_github_resources() -> None:
     assert "mailto:" not in page
     assert page.count("data-contact-open") == 3
     assert "Request access" in page
+    assert page.count("https://github.com/deepubuntu/fraeno-demo-robot") >= 3
+    assert "Try the demo robot" in page
     assert "Install Fraeno" not in page
 
 
@@ -152,9 +154,11 @@ def test_site_submits_access_requests_through_the_contact_worker() -> None:
     assert 'role="dialog"' in page
     assert 'data-contact-form' in page
     assert 'name="website"' in page
+    assert 'name="github"' in page
     assert 'tabindex="-1"' in page
     assert '"/api/contact"' in script
     assert "dwell_ms" in script
+    assert 'github: fields.get("github")' in script
     assert "thabhelo@deepubuntu.com" in script
     worker = Path(__file__).parents[1] / "contact-worker" / "src" / "index.js"
     assert worker.exists()
@@ -328,7 +332,7 @@ def test_action_and_supported_systems_follow_the_approved_page_order() -> None:
 
     action = page.index('<section class="action section-shell"')
     coverage = page.index('<section class="availability section-shell"')
-    closing = page.index('<section class="closing">')
+    closing = page.index('<section class="closing" id="access">')
 
     assert action < coverage < closing
     assert "Fraeno in action" in page
@@ -514,6 +518,8 @@ def test_site_contact_form_keeps_message_optional_with_update_consent() -> None:
     assert 'fields.get("updates") === "on"' in script
     assert "env.CONTACTS.put" in worker
     assert "message: { min: 0, max: 4000 }" in worker
+    assert "github: { min: 1, max: 39 }" in worker
+    assert "GITHUB_LOGIN_PATTERN" in worker
     assert "/api/unsubscribe" in worker
     assert "List-Unsubscribe-Post" in worker
     assert "unsubscribe_token" in worker

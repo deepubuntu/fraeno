@@ -320,6 +320,10 @@ for (const trigger of document.querySelectorAll("[data-contact-open]")) {
   trigger.addEventListener("click", openContact);
 }
 
+if (window.location.hash === "#access") {
+  window.setTimeout(openContact, 0);
+}
+
 if (contactOverlay) {
   contactOverlay.addEventListener("click", (event) => {
     if (event.target === contactOverlay) {
@@ -354,6 +358,7 @@ if (contactForm) {
         body: JSON.stringify({
           name: fields.get("name"),
           email: fields.get("email"),
+          github: fields.get("github"),
           company: fields.get("company"),
           message: fields.get("message"),
           website: fields.get("website"),

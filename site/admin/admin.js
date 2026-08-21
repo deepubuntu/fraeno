@@ -196,16 +196,21 @@ const renderLeads = (leads) => {
   );
   leadsNode.innerHTML = sorted.length
     ? sorted
-        .map(
-          (lead) =>
+        .map((lead) => {
+          const github = lead.github
+            ? `<a href="https://github.com/${escapeHtml(lead.github)}" target="_blank" rel="noopener noreferrer">@${escapeHtml(lead.github)}</a>`
+            : "No GitHub username";
+          return (
             '<article class="lead-card">' +
             `<strong>${escapeHtml(lead.name || lead.email)}</strong>` +
             `<p><a href="mailto:${escapeHtml(lead.email)}">${escapeHtml(lead.email)}</a></p>` +
+            `<p>${github}</p>` +
             `<p class="muted">${escapeHtml(lead.company || "No company provided")}</p>` +
             `<p class="message">${escapeHtml(lead.last_message || "No message provided")}</p>` +
             `<p class="account-type">Last request ${escapeHtml(formatDate(lead.last_seen))}</p>` +
-            "</article>",
-        )
+            "</article>"
+          );
+        })
         .join("")
     : '<p class="muted">No access requests have been received yet.</p>';
 };

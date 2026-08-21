@@ -69,6 +69,7 @@ test("an access request sends only the customer confirmation", async () => {
     body: JSON.stringify({
       name: "Kelvin",
       email: "kelvin@example.com",
+      github: "kelvin-robotics",
       company: "NVIDIA",
       message: "Medical robotics",
       updates: true,
@@ -87,10 +88,12 @@ test("an access request sends only the customer confirmation", async () => {
   assert.equal(messages[0].replyTo.email, "thabhelo@deepubuntu.com");
   assert.equal(messages[0].subject, "We received your Fraeno access request");
   assert.match(messages[0].html, /We got your request/);
+  assert.match(messages[0].html, /@kelvin-robotics/);
   assert.doesNotMatch(messages[0].html, /New access request/);
 
   const stored = JSON.parse(records.get("kelvin@example.com"));
   assert.equal(stored.name, "Kelvin");
+  assert.equal(stored.github, "kelvin-robotics");
   assert.equal(stored.submissions, 1);
   assert.equal(stored.updates, true);
 });
@@ -141,6 +144,7 @@ test("only a valid Firebase admin token can read access requests", async () => {
       JSON.stringify({
         name: "Kelvin",
         email: "kelvin@example.com",
+        github: "kelvin-robotics",
         company: "NVIDIA",
         last_seen: "2026-08-17T07:40:00.000Z",
         unsubscribe_token: "private-token",
@@ -190,6 +194,7 @@ test("only a valid Firebase admin token can read access requests", async () => {
     const payload = await accepted.json();
     assert.equal(payload.leads.length, 1);
     assert.equal(payload.leads[0].email, "kelvin@example.com");
+    assert.equal(payload.leads[0].github, "kelvin-robotics");
     assert.equal(payload.leads[0].unsubscribe_token, undefined);
   } finally {
     globalThis.fetch = originalFetch;

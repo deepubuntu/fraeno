@@ -11,11 +11,13 @@ const FIREBASE_JWKS_URL =
 const FIELD_LIMITS = {
   name: { min: 1, max: 120 },
   email: { min: 5, max: 254 },
+  github: { min: 1, max: 39 },
   company: { min: 0, max: 200 },
   message: { min: 0, max: 4000 },
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const GITHUB_LOGIN_PATTERN = /^(?!-)(?!.*--)[A-Za-z0-9-]{1,39}(?<!-)$/;
 
 function reject(status, reason) {
   return new Response(JSON.stringify({ ok: false, reason }), {
@@ -150,6 +152,7 @@ async function handleAdminLeads(request, env) {
         leads.push({
           name: record.name || "",
           email: record.email || "",
+          github: record.github || "",
           company: record.company || "",
           last_message: record.last_message || "",
           updates: record.updates === true,
@@ -224,6 +227,9 @@ function validate(payload) {
   }
   if (!EMAIL_PATTERN.test(payload.email.trim())) {
     return "email must be a valid address";
+  }
+  if (!GITHUB_LOGIN_PATTERN.test(payload.github.trim())) {
+    return "github must be a valid username";
   }
   return null;
 }
@@ -355,6 +361,7 @@ export default {
 
     const name = payload.name.trim();
     const email = payload.email.trim();
+    const github = payload.github.trim();
     const company = (payload.company || "").trim();
     const message = (payload.message || "").trim();
     const wantsUpdates = payload.updates === true;
@@ -375,6 +382,7 @@ export default {
       JSON.stringify({
         name,
         email,
+        github,
         company,
         unsubscribe_token: unsubscribeToken,
         updates: wantsUpdates || (existing ? existing.updates === true : false),
@@ -390,6 +398,10 @@ export default {
         emailParagraph(
           "Thanks for reaching out. Your request has been received and we " +
             "read every single one."
+        ) +
+        emailParagraph(
+          `We will match the GitHub account <strong>@${github}</strong> to ` +
+            "your Fraeno App installation before enabling private-beta checks."
         ) +
         emailParagraph(
           "Fraeno is built by a small team on a simple belief that " +
@@ -416,7 +428,9 @@ export default {
         text:
           "Hi there,\n\n" +
           "Thanks for reaching out. Your request has been received and we " +
-          "read every single one.\n\n" +
+            "read every single one.\n\n" +
+          `We will match the GitHub account @${github} to your Fraeno App ` +
+            "installation before enabling private-beta checks.\n\n" +
           "Fraeno is built by a small team on a simple belief that " +
           "robots can be dangerous, even deadly, and we want to make sure " +
           "bad code doesn't accidentally cause that. Conversations like " +
