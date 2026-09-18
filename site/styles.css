@@ -935,6 +935,7 @@ h1 {
 
 .physics-waitlist {
   margin-top: 2rem;
+  scroll-margin-top: 7rem;
   padding: 1.5rem;
   border: 1px solid var(--line);
   border-radius: 0.8rem;
