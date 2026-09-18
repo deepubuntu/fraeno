@@ -20,6 +20,16 @@ class CommandStep:
 
 
 @dataclass(frozen=True)
+class SimulatedEstopConfig:
+    stop_topic: str
+    velocity_topic: str
+    minimum_initial_speed: float = 0.1
+    stopped_speed_tolerance: float = 0.05
+    maximum_stop_seconds: float = 0.6
+    motion_timeout_seconds: float = 2.0
+
+
+@dataclass(frozen=True)
 class Ros2ObserverConfig:
     launch_command: tuple[str, ...]
     warmup_seconds: float = 2.0
@@ -32,6 +42,7 @@ class Ros2ObserverConfig:
     diagnostics_topics: frozenset[str] = frozenset()
     transform_topics: frozenset[str] = frozenset()
     shutdown_timeout_seconds: float = 5.0
+    simulated_estop: SimulatedEstopConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -217,6 +228,37 @@ def _ros2_observer(
             raw.get("shutdown_timeout_seconds"),
             "validation.observe.ros2.shutdown_timeout_seconds",
             5.0,
+        ),
+        simulated_estop=_simulated_estop(raw.get("simulated_estop")),
+    )
+
+
+def _simulated_estop(raw: Any) -> SimulatedEstopConfig | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ConfigError("validation.observe.ros2.simulated_estop must be an object")
+    def absolute_topic(value: Any, name: str) -> str:
+        if not isinstance(value, str) or not value.startswith("/") or len(value) < 2:
+            raise ConfigError(f"simulated_estop.{name} must be an absolute ROS topic")
+        return value
+
+    stop_topic = absolute_topic(raw.get("stop_topic"), "stop_topic")
+    velocity_topic = absolute_topic(raw.get("velocity_topic"), "velocity_topic")
+    return SimulatedEstopConfig(
+        stop_topic=stop_topic,
+        velocity_topic=velocity_topic,
+        minimum_initial_speed=_positive_float(
+            raw.get("minimum_initial_speed"), "simulated_estop.minimum_initial_speed", 0.1
+        ),
+        stopped_speed_tolerance=_non_negative_float(
+            raw.get("stopped_speed_tolerance"), "simulated_estop.stopped_speed_tolerance", 0.05
+        ),
+        maximum_stop_seconds=_positive_float(
+            raw.get("maximum_stop_seconds"), "simulated_estop.maximum_stop_seconds", 0.6
+        ),
+        motion_timeout_seconds=_positive_float(
+            raw.get("motion_timeout_seconds"), "simulated_estop.motion_timeout_seconds", 2.0
         ),
     )
 

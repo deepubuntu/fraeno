@@ -26,6 +26,7 @@ setup(
         "console_scripts": [
             "controller = fraeno_ros_fixture.controller:main",
             "sensor_driver = fraeno_ros_fixture.sensor_driver:main",
+            "simulated_plant = fraeno_ros_fixture.simulated_plant:main",
         ],
     },
 )

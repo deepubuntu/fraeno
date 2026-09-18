@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Any
@@ -172,7 +173,55 @@ def _contract_findings(
                     topic,
                 )
             )
+    findings.extend(_simulated_estop_findings(observation, config))
     return findings
+
+
+def _simulated_estop_findings(
+    observation: SystemObservation, config: ValidationConfig
+) -> list[Finding]:
+    scenario = config.ros2_observer.simulated_estop if config.ros2_observer else None
+    if scenario is None:
+        return []
+    evidence = observation.metadata.get("simulated_estop")
+    if not isinstance(evidence, dict):
+        return [
+            Finding("simulated-estop-evidence-missing", "No simulated e-stop result was recorded.")
+        ]
+
+    def measurement(name: str) -> float | None:
+        value = evidence.get(name)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        result = float(value)
+        return result if math.isfinite(result) and result >= 0 else None
+
+    initial = measurement("initial_speed")
+    final = measurement("final_speed")
+    if initial is None or final is None:
+        return [
+            Finding("simulated-estop-evidence-missing", "Simulated speed evidence is incomplete.")
+        ]
+    if initial < scenario.minimum_initial_speed:
+        return [Finding("simulated-estop-no-motion", "Robot model was not moving before stop.")]
+    if evidence.get("stop_triggered") is not True:
+        return [Finding("simulated-estop-evidence-missing", "Simulated stop was not triggered.")]
+    if not isinstance(evidence.get("post_stop_samples"), int) or evidence["post_stop_samples"] < 3:
+        return [Finding("simulated-estop-evidence-missing", "Post-stop speed samples are missing.")]
+    latency = measurement("stop_latency_seconds")
+    if latency is None or latency > scenario.maximum_stop_seconds:
+        return [Finding(
+            "simulated-estop-timeout",
+            f"Simulated robot did not stop within {scenario.maximum_stop_seconds:g} seconds.",
+            scenario.velocity_topic,
+        )]
+    if final > scenario.stopped_speed_tolerance:
+        return [Finding(
+            "simulated-estop-resumed-motion",
+            "Simulated robot moved after the stop response.",
+            scenario.velocity_topic,
+        )]
+    return []
 
 
 def _infrastructure_findings(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import rclpy
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
@@ -8,7 +9,7 @@ from geometry_msgs.msg import TransformStamped
 from rclpy.action import ActionServer
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from std_msgs.msg import Float64
+from std_msgs.msg import Bool, Float64
 from std_srvs.srv import Trigger
 from tf2_msgs.action import LookupTransform
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
@@ -23,12 +24,15 @@ class Controller(Node):
             durability=DurabilityPolicy.VOLATILE,
         )
         self._last_sensor_at: float | None = None
+        self._stopped = False
+        self._ignore_stop = Path("fraeno-fixture-version.txt").read_text().strip().startswith("3.")
         self._commands = self.create_publisher(
             Float64, "/robot/command", reliable
         )
         self.create_subscription(
             Float64, "/sensor/reading", self._on_sensor, reliable
         )
+        self.create_subscription(Bool, "/robot/e_stop", self._on_stop, 10)
         self._diagnostics = self.create_publisher(
             DiagnosticArray, "/diagnostics", 10
         )
@@ -51,8 +55,15 @@ class Controller(Node):
     def _on_sensor(self, message: Float64) -> None:
         self._last_sensor_at = time.monotonic()
         command = Float64()
-        command.data = max(-1.0, min(1.0, message.data))
+        if self._stopped:
+            command.data = 1.0 if self._ignore_stop else 0.0
+        else:
+            command.data = max(-1.0, min(1.0, message.data))
         self._commands.publish(command)
+
+    def _on_stop(self, message: Bool) -> None:
+        if message.data:
+            self._stopped = True
 
     def _is_healthy(self) -> bool:
         return (

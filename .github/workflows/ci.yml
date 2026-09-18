@@ -93,8 +93,10 @@ jobs:
           cp -a . /tmp/fraeno-baseline
           cp -a . /tmp/fraeno-safe
           cp -a . /tmp/fraeno-broken
+          cp -a . /tmp/fraeno-estop-broken
           cp fixtures/ros2_qos_robot/profiles/safe.txt /tmp/fraeno-safe/fixtures/ros2_qos_robot/fraeno-fixture-version.txt
           cp fixtures/ros2_qos_robot/profiles/broken.txt /tmp/fraeno-broken/fixtures/ros2_qos_robot/fraeno-fixture-version.txt
+          cp fixtures/ros2_qos_robot/profiles/estop_broken.txt /tmp/fraeno-estop-broken/fixtures/ros2_qos_robot/fraeno-fixture-version.txt
       - name: Compatible update passes live ROS 2 validation
         run: >-
           docker run --rm
@@ -107,6 +109,13 @@ jobs:
           --candidate /work/candidate
           --config /work/baseline/.fraeno.yml
           --output /output/fraeno-safe-report.json
+      - name: Safe update stops the simulated robot
+        run: >-
+          jq -e '.outcome == "pass" and
+          .comparison.outcome == "pass" and
+          .candidate.observation.metadata.simulated_estop.stop_triggered == true and
+          .candidate.observation.metadata.simulated_estop.stop_latency_seconds <= 0.6'
+          fraeno-safe-report.json
       - name: QoS-breaking update is blocked
         run: |
           set +e
@@ -123,6 +132,25 @@ jobs:
           result=$?
           set -e
           test "$result" -eq 1
+      - name: Update ignoring simulated e-stop is blocked
+        run: |
+          set +e
+          docker run --rm \
+            --volume /tmp/fraeno-baseline:/work/baseline \
+            --volume /tmp/fraeno-estop-broken:/work/candidate \
+            --volume "$PWD:/output" \
+            fraeno-ros2-runner:test \
+            fraeno validate \
+            --baseline /work/baseline \
+            --candidate /work/candidate \
+            --config /work/baseline/.fraeno.yml \
+            --output /output/fraeno-estop-broken-report.json
+          result=$?
+          set -e
+          test "$result" -eq 1
+          jq -e '.outcome == "block" and
+            ([.comparison.findings[].code] | index("simulated-estop-timeout") != null)'
+            fraeno-estop-broken-report.json
       - name: Upload ROS 2 evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

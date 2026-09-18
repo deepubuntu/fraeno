@@ -15,5 +15,10 @@ def generate_launch_description() -> LaunchDescription:
                 executable="controller",
                 output="screen",
             ),
+            Node(
+                package="fraeno_ros_fixture",
+                executable="simulated_plant",
+                output="screen",
+            ),
         ]
     )
