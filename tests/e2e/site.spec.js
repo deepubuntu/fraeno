@@ -6,7 +6,7 @@ test("loads the product story without layout overflow", async ({ page }) => {
   await expect(page).toHaveTitle(/Fraeno/);
   await expect(
     page.getByRole("heading", {
-      name: "Catch dangerous robot behavior before deployment.",
+      name: "Catch catastrophic robot behavior before deployment.",
     }),
   ).toBeVisible();
 

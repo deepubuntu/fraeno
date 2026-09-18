@@ -69,7 +69,7 @@ def test_site_has_expected_identity_and_local_assets() -> None:
 def test_site_preserves_approved_product_copy() -> None:
     page = (SITE / "index.html").read_text()
 
-    assert "Catch dangerous robot behavior before deployment." in page
+    assert "Catch catastrophic robot behavior before deployment." in page
     assert (
         "essentially, dependabot for robots + a security gate before deployment."
     ) in page
@@ -354,7 +354,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )[0]
 
     assert (
-        "Catch dangerous robot behavior before deployment."
+        "Catch catastrophic robot behavior before deployment."
         in page
     )
     assert 'class="hero-support"' in page
