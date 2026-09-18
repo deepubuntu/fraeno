@@ -864,7 +864,7 @@ h1 {
 .availability {
   display: grid;
   padding-top: 2rem;
-  padding-bottom: 10rem;
+  padding-bottom: 5rem;
   border-top: 1px solid var(--line);
   grid-template-columns: 0.55fr 1fr;
   gap: 2rem;
@@ -891,6 +891,38 @@ h1 {
   max-width: 27rem;
   color: var(--quiet);
   font-size: 0.65rem;
+}
+
+.coming-soon {
+  display: grid;
+  padding-top: clamp(4rem, 8vw, 8rem);
+  padding-bottom: clamp(5rem, 9vw, 9rem);
+  border-top: 1px solid var(--line);
+  grid-template-columns: 0.55fr 1fr;
+  gap: 2rem;
+}
+
+.coming-soon > div {
+  max-width: 44rem;
+}
+
+.coming-soon h2 {
+  margin: 0 0 1.5rem;
+  font-size: clamp(2.3rem, 4.6vw, 4.8rem);
+  font-weight: 400;
+  letter-spacing: -0.065em;
+  line-height: 0.98;
+}
+
+.coming-soon p:not(.section-label) {
+  max-width: 40rem;
+  color: var(--muted);
+  font-size: clamp(0.95rem, 1.35vw, 1.15rem);
+  line-height: 1.5;
+}
+
+.coming-soon p:not(.section-label):last-child {
+  margin-bottom: 0;
 }
 
 .closing {
@@ -1453,8 +1485,13 @@ h1 {
   }
 
   .availability {
-    padding-bottom: 7rem;
+    padding-bottom: 4rem;
     grid-template-columns: 1fr;
+  }
+
+  .coming-soon {
+    grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
   .availability-list {
