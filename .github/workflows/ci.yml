@@ -149,7 +149,7 @@ jobs:
           set -e
           test "$result" -eq 1
           jq -e '.outcome == "block" and
-            ([.comparison.findings[].code] | index("simulated-estop-timeout") != null)'
+            ([.comparison.findings[].code] | index("simulated-estop-timeout") != null)' \
             fraeno-estop-broken-report.json
       - name: Upload ROS 2 evidence
         if: always()
