@@ -162,6 +162,17 @@ def test_site_submits_access_requests_through_the_contact_worker() -> None:
     assert "thabhelo@deepubuntu.com" in script
 
 
+def test_physics_waitlist_is_visible_and_separate_from_access_requests() -> None:
+    page = (SITE / "index.html").read_text()
+    script = (SITE / "site.js").read_text()
+
+    assert 'href="#physics-waitlist"' in page
+    assert 'id="physics-waitlist"' in page
+    assert "Join waitlist" in page
+    assert '"/api/waitlist"' in script
+    assert "You are on the physics checks waitlist" in script
+
+
 def test_admin_console_is_protected_and_uses_product_records() -> None:
     page = (SITE / "admin" / "index.html").read_text()
     script = (SITE / "admin" / "admin.js").read_text()
@@ -239,7 +250,7 @@ def test_site_uses_product_motion_without_decorative_media() -> None:
     assert 'href="/assets/inter-tight-latin.woff2"' in page
     assert "data-hero-visual" in page
     assert "data-trace" in page
-    assert 'src="/site.js?v=a3e1d9cd"' in page
+    assert 'src="/site.js?v=physics-waitlist-1"' in page
     assert page.count("A bad update can make a robot move the wrong way") == 1
     why_section = page.split('<section class="system-intro section-shell"', 1)[1].split(
         '<section class="proof"', 1
@@ -348,7 +359,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
-    assert 'href="/styles.css?v=physics-roadmap-1"' in page
+    assert 'href="/styles.css?v=physics-waitlist-1"' in page
     assert ".hero-support .round-link" in styles
     assert "padding-top: clamp(11.5rem, 22vh, 14rem)" in styles
     assert "padding-top: 11rem" in styles

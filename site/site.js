@@ -389,3 +389,47 @@ if (contactForm) {
     }
   });
 }
+
+const physicsWaitlist = document.querySelector("[data-physics-waitlist]");
+const physicsWaitlistStatus = document.querySelector("[data-physics-waitlist-status]");
+const physicsWaitlistOpenedAt = Date.now();
+
+if (physicsWaitlist) {
+  physicsWaitlist.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const emailInput = physicsWaitlist.querySelector('input[name="email"]');
+    const submit = physicsWaitlist.querySelector('button[type="submit"]');
+    const fields = new FormData(physicsWaitlist);
+    if (!emailInput.checkValidity()) {
+      emailInput.reportValidity();
+      return;
+    }
+    physicsWaitlistStatus.textContent = "";
+    physicsWaitlistStatus.className = "physics-waitlist-status";
+    submit.disabled = true;
+    try {
+      const response = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: fields.get("email"),
+          website: fields.get("website"),
+          dwell_ms: Date.now() - physicsWaitlistOpenedAt,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.reason || "please try again");
+      }
+      physicsWaitlist.reset();
+      physicsWaitlistStatus.textContent = "You are on the physics checks waitlist. Thank you!";
+      physicsWaitlistStatus.className = "physics-waitlist-status is-success";
+    } catch {
+      physicsWaitlistStatus.textContent =
+        "That did not go through. Please try again or email thabhelo@deepubuntu.com.";
+      physicsWaitlistStatus.className = "physics-waitlist-status is-error";
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}

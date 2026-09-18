@@ -187,6 +187,7 @@ async function handleAdminLeads(request, env) {
           first_seen: record.first_seen || "",
           last_seen: record.last_seen || "",
           submissions: Number(record.submissions || 0),
+          physics_waitlist: record.physics_waitlist === true,
         });
       }
     });
@@ -379,6 +380,37 @@ export default {
       return reject(400, "the submission failed validation");
     }
 
+    if (pathname === "/api/waitlist") {
+      if (typeof payload.email !== "string") {
+        return reject(400, "email is required");
+      }
+      const email = payload.email.trim().toLowerCase();
+      if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
+        return reject(400, "email must be a valid address");
+      }
+      const existing = await env.CONTACTS.get(email, "json");
+      const now = new Date().toISOString();
+      await env.CONTACTS.put(
+        email,
+        JSON.stringify({
+          ...(existing || {}),
+          email,
+          name: existing?.name || "",
+          company: existing?.company || "",
+          updates: existing?.updates === true,
+          physics_waitlist: true,
+          physics_waitlisted_at: existing?.physics_waitlisted_at || now,
+          first_seen: existing?.first_seen || now,
+          last_seen: now,
+          submissions: existing?.submissions || 0,
+        })
+      );
+      return jsonResponse({ ok: true });
+    }
+    if (pathname !== "/api/contact") {
+      return reject(404, "not found");
+    }
+
     const invalid = validate(payload);
     if (invalid !== null) {
       return reject(400, invalid);
@@ -404,6 +436,7 @@ export default {
     await env.CONTACTS.put(
       key,
       JSON.stringify({
+        ...(existing || {}),
         name,
         email,
         company,

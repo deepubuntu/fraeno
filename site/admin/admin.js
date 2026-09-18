@@ -138,7 +138,8 @@ const renderMetrics = (leads, usage) => {
   ).length;
   const checks = usage.reduce((sum, item) => sum + Number(item.checks_started || 0), 0);
   const values = [
-    ["Leads", leads.length],
+    ["Access requests", leads.filter((lead) => lead.submissions > 0).length],
+    ["Physics waitlist", leads.filter((lead) => lead.physics_waitlist).length],
     ["Installed accounts", installed],
     ["Activated accounts", activated],
     ["Monthly active", monthlyActive],
@@ -204,15 +205,16 @@ const renderLeads = (leads) => {
             '<article class="lead-card">' +
             `<strong>${escapeHtml(lead.name || lead.email)}</strong>` +
             `<p><a href="mailto:${escapeHtml(lead.email)}">${escapeHtml(lead.email)}</a></p>` +
-            `<p>${github}</p>` +
+            (lead.physics_waitlist ? '<p class="account-type">Physics checks waitlist</p>' : "") +
+            (lead.submissions > 0 ? `<p>${github}</p>` : "") +
             `<p class="muted">${escapeHtml(lead.company || "No company provided")}</p>` +
-            `<p class="message">${escapeHtml(lead.last_message || "No message provided")}</p>` +
-            `<p class="account-type">Last request ${escapeHtml(formatDate(lead.last_seen))}</p>` +
+            (lead.submissions > 0 ? `<p class="message">${escapeHtml(lead.last_message || "No message provided")}</p>` : "") +
+            `<p class="account-type">Last signup ${escapeHtml(formatDate(lead.last_seen))}</p>` +
             "</article>"
           );
         })
         .join("")
-    : '<p class="muted">No access requests have been received yet.</p>';
+    : '<p class="muted">No signups have been received yet.</p>';
 };
 
 const loadDashboard = async () => {
