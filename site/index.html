@@ -72,8 +72,8 @@
         "description": "Fraeno catches software changes that make robots behave dangerously."
       }
     </script>
-    <link rel="stylesheet" href="/styles.css?v=physics-roadmap-1" />
-    <script src="/site.js?v=a3e1d9cd" defer></script>
+    <link rel="stylesheet" href="/styles.css?v=physics-waitlist-1" />
+    <script src="/site.js?v=physics-waitlist-1" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -146,6 +146,7 @@
                 <span>See Fraeno in action</span>
                 <i aria-hidden="true">→</i>
               </a>
+              <a class="hero-waitlist-link" href="#physics-waitlist">Join the physics checks waitlist →</a>
             </div>
           </div>
         </div>
@@ -347,6 +348,18 @@
             These checks are in development. Today, Fraeno compares software-visible behavior;
             it does not verify physical limits or certify that a robot is safe.
           </p>
+          <form class="physics-waitlist" id="physics-waitlist" data-physics-waitlist novalidate>
+            <h3>Want to try physics checks when they are ready?</h3>
+            <p>Join the waitlist. We will email you about this feature when there is something to try.</p>
+            <input class="contact-trap" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+            <label for="physics-waitlist-email">Work email</label>
+            <div class="physics-waitlist-fields">
+              <input id="physics-waitlist-email" type="email" name="email" required maxlength="254" autocomplete="email" />
+              <button type="submit">Join waitlist <span aria-hidden="true">→</span></button>
+            </div>
+            <small>Only updates about physics checks. <a href="/privacy.html">Privacy</a></small>
+            <p class="physics-waitlist-status" data-physics-waitlist-status role="status"></p>
+          </form>
         </div>
       </section>
 

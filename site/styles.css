@@ -925,6 +925,65 @@ h1 {
   margin-bottom: 0;
 }
 
+.hero-waitlist-link {
+  display: inline-block;
+  margin-top: 1rem;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.physics-waitlist {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+}
+
+.physics-waitlist h3 {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  font-weight: 500;
+}
+
+.physics-waitlist label {
+  display: block;
+  margin: 1rem 0 0.4rem;
+}
+
+.physics-waitlist-fields {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.physics-waitlist-fields input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+.physics-waitlist-fields button {
+  padding: 0.75rem 1rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--black);
+  color: var(--white);
+  font: inherit;
+  cursor: pointer;
+}
+
+.physics-waitlist-fields button:disabled { opacity: 0.6; }
+.physics-waitlist small { display: block; margin-top: 0.6rem; }
+.physics-waitlist-status.is-error { color: #a32d13; }
+.physics-waitlist-status.is-success { color: #165d37; }
+
+@media (max-width: 520px) {
+  .physics-waitlist-fields { flex-direction: column; }
+}
+
 .closing {
   background: var(--hero);
 }

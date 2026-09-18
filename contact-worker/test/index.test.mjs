@@ -114,6 +114,49 @@ for (const outcome of [201, 401, 429, 500, "timeout", "missing-key"]) {
 
 }
 
+test("physics waitlist stores interest separately without sending email or erasing an access request", async () => {
+  const records = new Map();
+  const env = {
+    CONTACTS: {
+      async get(key, type) {
+        const value = records.get(key);
+        return value && type === "json" ? JSON.parse(value) : value || null;
+      },
+      async put(key, value) { records.set(key, value); },
+    },
+  };
+  let emailCalls = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { emailCalls++; throw new Error("unexpected email"); };
+  const submit = (email, dwell_ms = 4000) => worker.fetch(
+    new Request("https://fraeno.com/api/waitlist", {
+      method: "POST",
+      headers: { Origin: "https://fraeno.com", "Content-Type": "application/json" },
+      body: JSON.stringify({ email, website: "", dwell_ms }),
+    }),
+    env
+  );
+  try {
+    assert.equal((await submit("bad-address")).status, 400);
+    assert.equal((await submit("pilot@example.com", 10)).status, 400);
+    assert.equal((await submit("Pilot@Example.com")).status, 200);
+    const first = JSON.parse(records.get("pilot@example.com"));
+    assert.equal(first.physics_waitlist, true);
+    assert.equal(first.updates, false);
+    assert.equal(first.submissions, 0);
+    records.set("pilot@example.com", JSON.stringify({ ...first, name: "Pilot", github: "pilot", submissions: 1, last_message: "robot" }));
+    assert.equal((await submit("pilot@example.com")).status, 200);
+    const second = JSON.parse(records.get("pilot@example.com"));
+    assert.equal(second.name, "Pilot");
+    assert.equal(second.github, "pilot");
+    assert.equal(second.last_message, "robot");
+    assert.equal(second.physics_waitlisted_at, first.physics_waitlisted_at);
+    assert.equal(emailCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("admin configuration exposes only the public Firebase client settings", async () => {
   const response = await worker.fetch(
     new Request("https://fraeno.com/api/admin/config"),
