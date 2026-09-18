@@ -72,7 +72,7 @@
         "description": "Fraeno catches software changes that make robots behave dangerously."
       }
     </script>
-    <link rel="stylesheet" href="/styles.css?v=b20dbb2e" />
+    <link rel="stylesheet" href="/styles.css?v=physics-roadmap-1" />
     <script src="/site.js?v=a3e1d9cd" defer></script>
   </head>
   <body>
@@ -221,17 +221,17 @@
             <div class="proof-result">
               <div
                 class="trace"
-                aria-label="Example: the stop button was pressed, the robot kept moving, and Fraeno blocked the update"
+                aria-label="Example: an update breaks sensor delivery, the controller stops sending commands, and Fraeno blocks the update"
                 data-trace
               >
                 <div class="trace-node">
-                  <span>Stop button</span>
-                  <strong>Pressed</strong>
+                  <span>Driver update</span>
+                  <strong>Changed sensor delivery</strong>
                 </div>
                 <div class="trace-line trace-line-live" aria-hidden="true"><span></span></div>
                 <div class="trace-node">
-                  <span>Robot</span>
-                  <strong>Kept moving</strong>
+                  <span>Controller</span>
+                  <strong>Stopped sending commands</strong>
                 </div>
                 <div class="trace-line trace-line-broken" aria-hidden="true"></div>
                 <div class="trace-node">
@@ -243,7 +243,7 @@
               <div class="proof-footer">
                 <div>
                   <span>Before deployment</span>
-                  <strong>Real robot protected</strong>
+                  <strong>Bad update blocked</strong>
                 </div>
                 <a
                   href="https://github.com/Thabhelo/fraeno-demo-trial/actions/runs/32513414015"
@@ -266,8 +266,8 @@
             <p class="section-label">A safe place for the robot</p>
             <h2 id="method-title">Try the update away from the real robot.</h2>
             <p class="method-summary">
-              Fraeno runs the update on the robot inside a virtual environment. It watches how
-              the robot senses, moves, and responds without putting the real machine at risk.
+              Fraeno runs the existing and updated robot software in isolated environments. It
+              compares the behavior you configure without running the test on physical hardware.
             </p>
           </div>
         </header>
@@ -279,7 +279,7 @@
           </li>
           <li data-step>
             <span>02</span>
-            <strong>Create a virtual copy of the robot</strong>
+            <strong>Set up an isolated test environment</strong>
           </li>
           <li data-step>
             <span>03</span>
@@ -287,7 +287,7 @@
           </li>
           <li data-step>
             <span>04</span>
-            <strong>Detect and block dangerous changes</strong>
+            <strong>Detect and block observed regressions</strong>
           </li>
         </ol>
       </section>
@@ -314,7 +314,7 @@
             loop
             playsinline
             preload="none"
-            aria-label="Fraeno demo reel: every update boots a virtual replica of the robot, behavior is diffed against baseline, and dangerous updates are blocked before they reach hardware."
+            aria-label="Fraeno demo reel: existing and updated robot software run separately, their observed behavior is compared, and a regression blocks the update."
           ></video>
         </div>
       </section>
@@ -331,6 +331,23 @@
           Fraeno checks the robot actions you choose. It cannot promise every possible action is
           safe.
         </small>
+      </section>
+
+      <section class="coming-soon section-shell" id="physics" aria-labelledby="physics-title" data-reveal>
+        <p class="section-label">Coming soon</p>
+        <div>
+          <h2 id="physics-title">Physics checks for robot updates.</h2>
+          <p>
+            We want to test physical limits such as momentum and torque, and check that a robot
+            stops when its emergency stop is triggered. That will require an accurate robot model,
+            motion and force measurements from a simulator, and tests that fail when evidence is
+            missing.
+          </p>
+          <p>
+            These checks are in development. Today, Fraeno compares software-visible behavior;
+            it does not verify physical limits or certify that a robot is safe.
+          </p>
+        </div>
       </section>
 
       <section class="closing" id="access">

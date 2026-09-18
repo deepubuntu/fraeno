@@ -105,10 +105,10 @@ def test_site_uses_light_accessible_presentation_and_plain_punctuation() -> None
 def test_site_shows_verified_proof_without_overclaiming() -> None:
     page = (SITE / "index.html").read_text()
 
-    assert "Stop button" in page
-    assert "Pressed" in page
-    assert "Robot" in page
-    assert "Kept moving" in page
+    assert "Driver update" in page
+    assert "Changed sensor delivery" in page
+    assert "Controller" in page
+    assert "Stopped sending commands" in page
     assert "Fraeno" in page
     assert "Blocked the update" in page
     proof_footer = page.split('class="proof-footer"', 1)[1].split("</a>", 1)[0]
@@ -118,8 +118,8 @@ def test_site_shows_verified_proof_without_overclaiming() -> None:
     )
     assert 'rel="noopener noreferrer"' in proof_footer
     assert "See a real Fraeno check" in proof_footer
-    assert "Real robot protected" in page
-    assert "Example: the stop button was pressed" in page
+    assert "Bad update blocked" in page
+    assert "Example: an update breaks sensor delivery" in page
     assert (
         "Fraeno checks the robot actions you choose. It cannot promise every possible action is"
         in page
@@ -307,10 +307,10 @@ def test_site_keeps_the_full_plain_language_method_illustration() -> None:
     assert '<section class="proof" id="method"' in page
     assert "Try the update away from the real robot." in page
     assert "Find the update" in page
-    assert "Create a virtual copy of the robot" in page
+    assert "Set up an isolated test environment" in page
     assert "Run the existing and updated software" in page
-    assert "Detect and block dangerous changes" in page
-    assert "without putting the real machine at risk" in page
+    assert "Detect and block observed regressions" in page
+    assert "without running the test on physical hardware" in page
     assert "minmax(28rem, 1.45fr)" in styles
 
 
@@ -319,14 +319,19 @@ def test_action_and_supported_systems_follow_the_approved_page_order() -> None:
 
     action = page.index('<section class="action section-shell"')
     coverage = page.index('<section class="availability section-shell"')
+    physics = page.index('<section class="coming-soon section-shell"')
     closing = page.index('<section class="closing" id="access">')
 
-    assert action < coverage < closing
+    assert action < coverage < physics < closing
     assert "Fraeno in action" in page
     assert 'class="action-video"' in page
     assert 'src="/assets/fraeno-demo-reel.mp4"' in page
     assert 'poster="/assets/fraeno-demo-poster.jpg"' in page
     assert "Supported systems" in page
+    assert "Physics checks for robot updates." in page
+    assert "momentum and torque" in page
+    assert "emergency stop" in page
+    assert "it does not verify physical limits" in page
     assert "Protect the robot from dangerous software updates." in page
 
 
@@ -343,7 +348,7 @@ def test_site_keeps_hero_copy_readable_and_centers_the_tablet_footer() -> None:
     )
     assert 'class="hero-support"' in page
     assert 'class="hero-aside"' not in page
-    assert 'href="/styles.css?v=b20dbb2e"' in page
+    assert 'href="/styles.css?v=physics-roadmap-1"' in page
     assert ".hero-support .round-link" in styles
     assert "padding-top: clamp(11.5rem, 22vh, 14rem)" in styles
     assert "padding-top: 11rem" in styles
