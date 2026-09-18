@@ -90,6 +90,32 @@ validation:
 This prevents a candidate from weakening the observer settings in its own
 commit. A custom observer remains supported for hardware-specific evidence.
 
+## Simulated e-stop response
+
+A trusted ROS 2 contract can request a simulated stop-response check:
+
+```yaml
+validation:
+  observe:
+    ros2:
+      simulated_estop:
+        stop_topic: /robot/e_stop
+        velocity_topic: /robot/velocity
+        minimum_initial_speed: 0.1
+        stopped_speed_tolerance: 0.05
+        maximum_stop_seconds: 0.6
+        motion_timeout_seconds: 2
+```
+
+The observer requires `std_msgs/msg/Float64` velocity evidence while the model
+is moving, publishes `std_msgs/msg/Bool` with `data: true` to the stop topic,
+and records the simulated velocity trace and stop latency. Missing evidence
+cannot pass. A candidate that remains in motion past the limit is blocked.
+The CI fixture uses a one-dimensional velocity model and checks both a passing
+update and an update that ignores the stop. This is a software simulation of
+stop response, not a test of a physical emergency-stop circuit or a claim that
+an arbitrary customer robot is physically safe.
+
 ## Local proof
 
 Build the same versioned image used by CI, then run the independent ROS 2

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import math
 import os
 import signal
 import statistics
@@ -96,6 +97,8 @@ class _Probe:
         self.transforms: set[str] = set()
         self.diagnostics: dict[str, int] = {}
         self.infrastructure_errors: list[str] = []
+        self._estop_velocity_samples: list[tuple[float, float]] = []
+        self.simulated_estop_result: dict[str, Any] | None = None
 
     def spin_for(self, duration_seconds: float) -> None:
         deadline = time.monotonic() + duration_seconds
@@ -143,6 +146,9 @@ class _Probe:
             self._subscribe(topic, topic_types.get(topic, []), "diagnostics")
         for topic in sorted(self._config.transform_topics):
             self._subscribe(topic, topic_types.get(topic, []), "transforms")
+        if self._config.simulated_estop is not None:
+            topic = self._config.simulated_estop.velocity_topic
+            self._subscribe(topic, topic_types.get(topic, []), "estop_velocity")
 
     def _subscribe(self, topic: str, type_names: list[str], purpose: str) -> None:
         for type_name in sorted(type_names):
@@ -182,7 +188,97 @@ class _Probe:
             return lambda message: self._record_rate(topic, message)
         if purpose == "diagnostics":
             return self._record_diagnostics
+        if purpose == "estop_velocity":
+            return self._record_estop_velocity
         return self._record_transforms
+
+    def _record_estop_velocity(self, message: Any) -> None:
+        try:
+            speed = float(message.data)
+        except (AttributeError, TypeError, ValueError):
+            self.infrastructure_errors.append("Simulated e-stop velocity is not numeric.")
+            return
+        if not math.isfinite(speed):
+            self.infrastructure_errors.append("Simulated e-stop velocity is not finite.")
+            return
+        self._estop_velocity_samples.append((time.monotonic(), speed))
+
+    def run_simulated_estop(self) -> None:
+        config = self._config.simulated_estop
+        if config is None:
+            return
+        topic_types = dict(self.node.get_topic_names_and_types())
+        if "std_msgs/msg/Float64" not in topic_types.get(config.velocity_topic, []):
+            self.infrastructure_errors.append(
+                f"Simulated e-stop velocity topic {config.velocity_topic} must publish Float64."
+            )
+            return
+        deadline = time.monotonic() + config.motion_timeout_seconds
+        while time.monotonic() < deadline:
+            if self._estop_velocity_samples and abs(self._estop_velocity_samples[-1][1]) >= (
+                config.minimum_initial_speed
+            ):
+                break
+            self._spin_once(self.node, timeout_sec=0.05)
+        if not self._estop_velocity_samples:
+            self.infrastructure_errors.append("Simulated e-stop velocity evidence is missing.")
+            return
+        initial_speed = abs(self._estop_velocity_samples[-1][1])
+        if initial_speed < config.minimum_initial_speed:
+            self.simulated_estop_result = {
+                "initial_speed": initial_speed,
+                "stop_latency_seconds": None,
+                "final_speed": initial_speed,
+                "stop_triggered": False,
+            }
+            return
+
+        stop_message = self._get_message("std_msgs/msg/Bool")()
+        stop_message.data = True
+        publisher = self.node.create_publisher(
+            self._get_message("std_msgs/msg/Bool"), config.stop_topic, 10
+        )
+        connected_until = time.monotonic() + 1.0
+        while publisher.get_subscription_count() == 0 and time.monotonic() < connected_until:
+            self._spin_once(self.node, timeout_sec=0.05)
+        if publisher.get_subscription_count() == 0:
+            self.infrastructure_errors.append(
+                f"No subscriber received simulated e-stop on {config.stop_topic}."
+            )
+            return
+
+        started = time.monotonic()
+        next_publish = started
+        consecutive_stopped = 0
+        stop_latency: float | None = None
+        sample_index = len(self._estop_velocity_samples)
+        first_post_stop_index = sample_index
+        while time.monotonic() - started < config.maximum_stop_seconds + 0.2:
+            now = time.monotonic()
+            if now >= next_publish:
+                publisher.publish(stop_message)
+                next_publish = now + 0.05
+            self._spin_once(self.node, timeout_sec=0.02)
+            for measured_at, speed in self._estop_velocity_samples[sample_index:]:
+                if abs(speed) <= config.stopped_speed_tolerance:
+                    consecutive_stopped += 1
+                    if consecutive_stopped == 3 and stop_latency is None:
+                        stop_latency = measured_at - started
+                else:
+                    consecutive_stopped = 0
+                    stop_latency = None
+            sample_index = len(self._estop_velocity_samples)
+        self.simulated_estop_result = {
+            "initial_speed": initial_speed,
+            "stop_latency_seconds": stop_latency,
+            "final_speed": abs(self._estop_velocity_samples[-1][1]),
+            "stop_triggered": True,
+            "post_stop_samples": sample_index - first_post_stop_index,
+            "velocity_trace": [
+                {"seconds_since_stop": round(measured_at - started, 4), "speed": speed}
+                for measured_at, speed in self._estop_velocity_samples[first_post_stop_index:]
+            ],
+        }
 
     def _record_rate(self, topic: str, message: Any) -> None:
         del message
@@ -334,6 +430,7 @@ class _Probe:
                     topic: [round(value, 6) for value in samples]
                     for topic, samples in sorted(self._rate_samples.items())
                 },
+                "simulated_estop": self.simulated_estop_result,
             },
         )
 
@@ -413,6 +510,7 @@ def observe_ros2(config: Ros2ObserverConfig) -> SystemObservation:
             probe.spin_for(config.warmup_seconds)
             graph_stable = probe.stabilize_graph()
             probe.measure_rates()
+            probe.run_simulated_estop()
             return probe.observation(graph_stable=graph_stable, process=process)
         finally:
             _stop_process_group(

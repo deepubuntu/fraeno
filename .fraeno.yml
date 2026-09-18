@@ -52,18 +52,28 @@ validation:
       rate_topics:
         - /sensor/reading
         - /robot/command
+        - /robot/velocity
       diagnostics_topics:
         - /diagnostics
       transform_topics:
         - /tf_static
       shutdown_timeout_seconds: 5
+      simulated_estop:
+        stop_topic: /robot/e_stop
+        velocity_topic: /robot/velocity
+        minimum_initial_speed: 0.1
+        stopped_speed_tolerance: 0.05
+        maximum_stop_seconds: 0.6
+        motion_timeout_seconds: 2
   contract:
     required_nodes:
       - /sensor_driver
       - /controller
+      - /simulated_plant
     required_topics:
       - /sensor/reading
       - /robot/command
+      - /robot/velocity
     required_services:
       - /robot/health
     required_actions:
